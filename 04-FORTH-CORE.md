@@ -622,6 +622,24 @@ trivially built from.
 | `FILL` | `( addr len char -- )` | BOOTSTRAP | A loop over `C!` using `DO`/`LOOP` (§6.5) and `I`. **MUST guard `len = 0` explicitly** — see §6.5's zero-length `DO`/`LOOP` trap; found missing by direct implementation, `addr 0 char FILL` wrote one stray byte instead of staying a true no-op. |
 | `CMOVE` | `( addr1 addr2 len -- )` | BOOTSTRAP | A loop over `C@`/`C!`. Low-to-high, overlapping-range corruption is a documented footgun inherited from the reference behavior, not something a Forth-source loop changes. **MUST guard `len = 0` explicitly**, same trap and same finding as `FILL` above. |
 
+**Native path for `FILL`/`CMOVE`.** Both stay BOOTSTRAP — the loops
+above remain the reference definitions that fix their behavior — but
+`01-HAL.md` §9 now gives every target a required pair of bulk
+primitives, `hal_mem_fill`/`hal_mem_copy`, and a target implementing
+these two words natively (§2.3) **SHOULD** do so by routing through
+them rather than writing its own loop. Two things the native path must
+still get right, since §2.3 requires observable behavior to match the
+reference exactly:
+
+- `len = 0` is a true no-op, same as the guarded loops above (the HAL
+  functions already guarantee this).
+- `hal_mem_copy` is overlap-safe; `CMOVE` is not. When the destination
+  starts inside the source range (`addr1 < addr2 < addr1 + len`), the
+  reference low-to-high loop propagates a repeating pattern, and a
+  native `CMOVE` **MUST** reproduce that — by running that one case as
+  a byte loop — rather than hand it to `hal_mem_copy` and silently
+  "fix" the footgun (`01-HAL.md` §9.3).
+
 ### 6.4 Return stack
 
 | Word | Effect | |

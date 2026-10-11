@@ -42,6 +42,27 @@ implement this entire document without reading `02-MEMORY-MODEL.md`.
 The portable layer above the HAL is what reads Forth-addressable memory
 (e.g. the `CHAR` bank) and hands the HAL plain values.
 
+**Resolved byte spans.** Two HAL surfaces exist purely to make bulk
+byte work fast — memory block operations (§9) and sprite blitting
+(§3.8) — and copying their operands out of memory first would defeat
+the point. They take a *resolved byte span* instead: a host pointer
+plus a length, which the portable layer has already translated from an
+arena address and bounds-checked against the owning bank before the
+call. This is the zero-copy form of the "opaque byte array the caller
+already extracted" above, not an exception to the rule it serves:
+
+- The HAL still never sees an arena address, a bank offset, or a bank
+  identity — only "these `len` bytes, here." It **MUST NOT** interpret
+  a span's pointer value, derive a neighbouring address from it, or
+  read or write outside it.
+- A span is valid only for the duration of the call. The HAL **MUST
+  NOT** retain the pointer afterwards.
+- Validation is the portable layer's job, done once, before the call. A
+  HAL implementation **MUST NOT** need to re-validate a span, the same
+  convention `hal_blit_glyph`'s coordinates already follow (§3.3).
+
+No other HAL function may take a pointer into Forth-addressable memory.
+
 ### 2.2 Non-blocking by default; blocking is a layer built on top
 
 Every HAL read primitive in this document — keyboard/input, the channel
@@ -305,7 +326,7 @@ already governs (`hal_blit_glyph`/`hal_clear_screen`'s `ink`/`paper`
 parameters, §3.3) — it is **not** a general pixel/graphics-mode palette.
 No `hal_draw_*` pixel primitive (§3.4) gains any palette awareness by
 this; a future indexed pixel/graphics mode remains genuinely out of this
-version's scope (§10) exactly as before, and would need its own
+version's scope (§11) exactly as before, and would need its own
 extension when it becomes real.
 
 **Color-resolution rule.** This single rule governs both what the HAL
@@ -370,8 +391,8 @@ changes when a palette is active:
   proposed; `PAL-base + N*64 PALETTE-BASE !` is trivial enough via
   ordinary `BANK@`/arithmetic/`!` that a convenience word isn't
   warranted yet.
-- ~~Whether §11's conformance checklist should gain rows for these
-  data/bank contracts~~ — resolved: see §11.
+- ~~Whether §12's conformance checklist should gain rows for these
+  data/bank contracts~~ — resolved: see §12.
 
 ### 3.7 Sysvar contract — `FONT` group
 
@@ -399,6 +420,96 @@ one so far uses a single fixed geometry decided at build time (Rebel-Sim:
 8×8, 256 chars, 1 byte/row), so there's no concrete cross-target need to
 make it runtime-inspectable yet. Revisit if a target's font ever needs
 to vary at runtime.
+
+### 3.8 Optional: sprite blit
+
+Sprite and tile drawing (`11-SPRITE-BANK.md`) is a per-pixel inner loop
+run many times per frame — the one place in the Screen subsystem where
+a portable loop over `hal_draw_pixel` (§3.4) is too slow to be the real
+implementation. The inner loop is therefore HAL surface; everything
+around it stays portable.
+
+```c
+/* Draws one sprite-bank entry's bitmap to the framebuffer with its
+ * top-left corner at pixel (x, y).
+ *
+ * `pixels` is a resolved byte span (§2.1) of exactly
+ * (width / 2) * height bytes: 4 bits per pixel, `height` rows of
+ * width / 2 bytes each, packed back to back with no row padding
+ * (11-SPRITE-BANK.md, "Pixel data"). Within a byte, the high nibble is
+ * the left pixel of the pair. `width` and `height` are multiples of 8
+ * and non-zero.
+ *
+ * `palette` is 16 already-resolved colors in this target's own color
+ * format — the same format `ink`/`paper` use in §3.3. A pixel whose
+ * value is n is drawn as palette[n], except n = 0, which is never
+ * drawn (below).
+ *
+ * `flags` is the entry header's attribute byte, unmodified: bit 0
+ * H-FLIP, bit 1 V-FLIP. Bits 2-7 are reserved and MUST be ignored. */
+void hal_blit_sprite(int32_t x, int32_t y,
+                      const uint8_t *pixels,
+                      uint16_t width, uint16_t height,
+                      const uint32_t palette[16], uint8_t flags);
+```
+
+Required behavior, identical on every target that provides it:
+
+- **Index 0 is transparent.** A source pixel of value `0` **MUST**
+  leave the destination pixel untouched; `palette[0]` is never read.
+  This holds for sprites and tiles alike — a tile that only partly
+  fills its cell must not stomp the rest of it.
+- **Flips are applied while drawing**, by walking the source in reverse
+  — columns for H-FLIP, rows for V-FLIP, both for both. The destination
+  rectangle is the same `width` × `height` at `(x, y)` either way; the
+  source bytes are never modified.
+- **The HAL clips.** `x`/`y` are signed, and any part of the
+  destination rectangle may lie outside the framebuffer; the HAL
+  **MUST** draw exactly the visible part and silently skip the rest,
+  including the fully-off-screen case. This is the one deliberate
+  departure from "the portable layer validates, the HAL doesn't"
+  (§3.3): a sprite half off the edge is ordinary game behavior, and
+  clipping belongs inside the loop that is being optimized. The
+  `pixels` span itself is still validated by the portable layer (§2.1).
+- **Framebuffer-only**, like §3.4: never touches `CHAR` or `ATTR`, and
+  has no interaction with the cursor. A tile drawn over the character
+  grid is therefore not recorded anywhere — a later `write_char` to
+  that cell, a cursor redraw (§3.5), or `redraw_all()` (§3.2) repaints
+  the cell from `CHAR` and erases it. Redrawing tiles afterwards is the
+  caller's job.
+- **No blending, scaling, or rotation.** Each drawn pixel replaces the
+  destination pixel outright.
+
+What stays portable, built once against this one function and **never
+reimplemented per target**:
+
+- Finding the `SPRT` bank, bounds-checking the entry index, reading
+  the entry header, and computing the entry's pixel-data offset —
+  including the derived offset cache (`11-SPRITE-BANK.md`, "Offset
+  cache"). The HAL never sees a bank, an entry index, or an entry
+  header; it sees one bitmap.
+- Producing `palette` from the bank's embedded 16 × `0xRRGGBB` entries.
+  This is the bank's own palette, not the character-grid one:
+  `PALETTE-BASE`, `PAL`, and `ATTR` (§3.6) play no part in a sprite
+  blit, and §3.6's statement that no pixel primitive gains palette
+  awareness from that mechanism still holds. A target whose host
+  `uint32_t` layout matches the bank's stored entries MAY pass a
+  pointer straight into the bank (a resolved span, §2.1) instead of
+  copying 16 values per blit.
+- **The sprite/tile distinction.** A tile blit is a sprite blit at
+  `(col × CHAR-CELL-W, row × CHAR-CELL-H)` — the portable layer does
+  the multiplication and calls `hal_blit_sprite`. There is no separate
+  HAL function for tiles, matching the bank format's own refusal to
+  distinguish them.
+
+**OPTIONAL**, on the same terms as §3.4: a target with no
+graphics-capable display MAY omit it, and SHOULD advertise the omission
+through a capability sysvar (§2.5). Unlike `hal_draw_line`/
+`hal_draw_rect`, though, this is not an acceleration of something the
+portable layer also implements — it is the only blit path. A target
+that offers sprite/tile words at all **MUST** implement
+`hal_blit_sprite` natively; a portable per-pixel fallback over
+`hal_draw_pixel` is not part of this specification.
 
 ---
 
@@ -618,7 +729,7 @@ target-specific:
   to run concurrently.
 
 No `hal_yield()` or equivalent function is defined by this document —
-see §8 for why that's a deliberate omission, not a gap.
+see §10 for why that's a deliberate omission, not a gap.
 
 ### 5.6 Session model
 
@@ -626,7 +737,7 @@ One outer-loop instance binds to exactly one input channel. Multiple
 simultaneous sessions (e.g. one keyboard-bound, one remote-bound) share
 memory banks, sysvars, and device state, and the one screen surface
 (§5.2) — this is the default model; whether concurrent sessions ever
-need explicit arbitration beyond that is genuinely open (§9), not
+need explicit arbitration beyond that is genuinely open (§11), not
 designed here because nothing has needed it yet.
 
 ---
@@ -962,7 +1073,73 @@ will format its own message and call this function with the result.
 
 ---
 
-## 9. Scheduling and cooperative yielding — a design note, not an interface
+## 9. Memory Block Operations
+
+### 9.1 Required HAL surface (Type A)
+
+Bulk copy and fill are the two byte-level operations hot enough, and
+well enough served by every platform's own optimized routines (a libc
+`memmove`/`memset`, a typed-array `copyWithin`/`fill`, a hand-written
+word-at-a-time or DMA loop), that running them as an interpreted
+byte-at-a-time loop wastes most of the available speed.
+
+```c
+/* Copies `len` bytes from `src` to `dst`. Overlap-safe: the result is
+ * as if the source bytes were first copied to a temporary buffer
+ * (memmove semantics, not memcpy). len = 0 MUST be a no-op. */
+void hal_mem_copy(uint8_t *dst, const uint8_t *src, size_t len);
+
+/* Sets `len` bytes starting at `dst` to `value`. len = 0 MUST be a
+ * no-op. */
+void hal_mem_fill(uint8_t *dst, uint8_t value, size_t len);
+```
+
+Both operands are resolved byte spans (§2.1): the portable layer has
+already translated arena addresses to host pointers and bounds-checked
+`len` against the bank(s) involved. Both functions are synchronous and
+**MUST NOT** block (§2.2).
+
+**REQUIRED on every target, unconditionally** — unlike Screen, Keyboard,
+or Storage there is no capability a target could lack; the simplest
+conformant implementation is a two-line byte loop.
+
+### 9.2 Pure bytes, no side effects
+
+These functions move bytes and do nothing else. They **MUST NOT**
+trigger any write-through, redraw, or sysvar update, whatever the
+destination happens to be. Copying into `CHAR` through `hal_mem_copy`
+leaves the framebuffer stale exactly as a Forth-level `CMOVE` into
+`CHAR` always has; `redraw_all()` (§3.2) remains the recovery path, and
+the rules about who must call it are unchanged.
+
+### 9.3 What the portable layer routes through them
+
+Everything above the HAL that copies or fills a run of
+Forth-addressable bytes **SHOULD** go through these two functions
+rather than its own loop:
+
+- The Forth block words — `FILL`, `CMOVE`, and anything built on them.
+  `04-FORTH-CORE.md` classifies these as BOOTSTRAP and already permits a
+  native implementation (§2.3 there); this is that native path.
+- The Screen Module's own bulk writes: `cls()` filling `CHAR` (and
+  `ATTR`, §3.6).
+- The Storage Module loading an asset payload into its bank, including
+  the zero-padding of a short payload (§6.3.1).
+
+Each Forth word's own semantics remain `04-FORTH-CORE.md`'s, and the
+portable layer is responsible for preserving them where they differ
+from the HAL's. The one case that matters: `CMOVE` is defined as a
+low-to-high byte loop, so when the destination starts inside the source
+range (`src < dst < src + len`) it *propagates* a repeating pattern
+rather than moving the block intact — the opposite of what an
+overlap-safe `hal_mem_copy` does. The portable layer **MUST** detect
+that case and run it as a plain low-to-high byte loop instead of
+calling the HAL; every other case, where the two agree, goes to
+`hal_mem_copy`.
+
+---
+
+## 10. Scheduling and cooperative yielding — a design note, not an interface
 
 There is **no `hal_yield()`** or scheduling function in this
 specification, deliberately. The requirement is narrow and already
@@ -982,7 +1159,7 @@ standardize, since nothing on the portable side calls out to it.
 
 ---
 
-## 10. Explicitly out of scope for this version
+## 11. Explicitly out of scope for this version
 
 Named here so an implementer knows these are deliberately not decided,
 rather than assuming an omission is an oversight. Do not design ahead of
@@ -1006,9 +1183,12 @@ somewhere, not before:
   primitive semantics are `04-FORTH-CORE.md`'s job, not this
   document's; noted here only so their absence from every list above
   isn't mistaken for an oversight.
-- **`SPRITE` sysvar group and any HAL surface for it.** No target has a
-  Forth-addressable sprite bank yet. (`FONT` is no longer deferred — see
-  §3.7, added M59 once Rebel-Sim actually had one.)
+- **`SPRITE` sysvar group.** The blit itself is now HAL surface (§3.8),
+  but it takes everything it needs as parameters; no sysvar field (an
+  active-bank pointer analogous to `FONT-BASE`, say) is defined, since
+  no target has a Forth-addressable sprite bank yet to say what one
+  would need to hold. (`FONT` is no longer deferred — see §3.7, added
+  M59 once Rebel-Sim actually had one.)
 - **Per-channel-type configuration** (§5). A future non-keyboard channel
   with real configuration needs — a radio link's frequency/spreading-
   factor parameters, for instance — will need somewhere to hold that
@@ -1024,13 +1204,14 @@ somewhere, not before:
 
 ---
 
-## 11. Conformance checklist
+## 12. Conformance checklist
 
 | Function | Direction | Requirement | Subsystem |
 |---|---|---|---|
 | `hal_blit_glyph` | A (target implements) | **REQUIRED** if display-capable | Screen §3.3 |
 | `hal_clear_screen` | A | **REQUIRED** if display-capable | Screen §3.3 |
 | `hal_draw_pixel`/`read_pixel`/`line`/`rect`/`rect_outline` | A | OPTIONAL | Screen §3.4 |
+| `hal_blit_sprite` | A | OPTIONAL; **REQUIRED** if the target offers sprite/tile words | Screen §3.8 |
 | `PAL`/`ATTR` banks + `PALETTE-BASE` field | data/bank | **REQUIRED** if display-capable | Screen §3.6, `02-MEMORY-MODEL.md` §4.6 |
 | `keyboard_push_raw_event` | B (target calls in) | **REQUIRED** if input-capable | Keyboard §4.2 |
 | `keyboard_has_event` / `keyboard_read_event` | portable | n/a — never reimplement | Keyboard §4.3 |
@@ -1044,6 +1225,8 @@ somewhere, not before:
 | `hal_write_file` | A | **REQUIRED** if storage-capable | Storage §6.2 |
 | `hal_millis` | A | **REQUIRED** | Timing §7.1 |
 | `hal_report_error` | A | **REQUIRED** | Error §8.1 |
+| `hal_mem_copy` | A | **REQUIRED** | Memory §9.1 |
+| `hal_mem_fill` | A | **REQUIRED** | Memory §9.1 |
 
 A target that is genuinely display-less, input-less, or storage-less
 (e.g. a headless UART-driven build) is not in violation for omitting

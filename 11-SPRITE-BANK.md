@@ -111,6 +111,12 @@ width is always a multiple of 8, hence always a multiple of 4bpp
 pixel-pairs). No row padding, no per-row alignment — rows are packed
 back to back for `height` rows.
 
+Within each byte, the high nibble (bits 7-4) is the left pixel of the
+pair and the low nibble (bits 3-0) is the right pixel. Rows are stored
+top to bottom, and bytes within a row left to right, so the first byte
+of an entry's block holds its top-left two pixels. This is the layout
+`01-HAL.md` §3.8's `hal_blit_sprite` consumes directly.
+
 ```
 entry_size(n) = (width[n] / 2) * height[n]
 ```
