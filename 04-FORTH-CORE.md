@@ -551,6 +551,16 @@ way §4.6 records `COLD`'s analogous obligation. No new mechanism is
 introduced — `INTERPRET` becoming BOOTSTRAP composes with mechanisms
 this document already requires elsewhere.
 
+**The driving loop has one branch besides this.**
+`06-ENVIRONMENTS.md` §5.2 lets another interactive program (a BASIC, a
+full-screen editor) stand in for the Forth prompt: before each
+iteration the driving loop reads the `ENV-ENTRY` sysvar
+(`03-SYSVARS.md` §12). When it is `0` — the fresh-boot value — the
+loop is exactly as described above. When it is non-zero, the loop
+**MUST** `EXECUTE` the word at that xt instead of reading a line and
+calling `INTERPRET`. The rollback obligation above is unchanged in
+either case, and its recovery path gains one step, stated in §8.
+
 **Load-order requirement**: `INTERPRET` MUST be the last BOOTSTRAP word
 loaded in §7.1's sequence, since it is the first point at which the
 bootstrap loader's own line-by-line reading MAY switch from whatever
@@ -959,7 +969,7 @@ arena.
 
 | Word | Effect | | Definition (if BOOTSTRAP) |
 |---|---|---|---|
-| `WARM` | `( -- )`, soft reset: clears both stacks and abandons whatever remains of the current input line (classic Forth `WARM`/`QUIT` semantics — control returns to the interpreter's own top level, not to the token after `WARM`); `DICT`/`MMAP`/every sysvar otherwise untouched | **KERNEL** | See the correction below — an earlier pass of this specification classified `WARM` as BOOTSTRAP, found wrong once §6.13 exists. |
+| `WARM` | `( -- )`, soft reset: clears both stacks and abandons whatever remains of the current input line (classic Forth `WARM`/`QUIT` semantics — control returns to the interpreter's own top level, not to the token after `WARM`); `DICT`/`MMAP`/every sysvar otherwise untouched, with the single exception of `ENV-REASON` (§8) | **KERNEL** | See the correction below — an earlier pass of this specification classified `WARM` as BOOTSTRAP, found wrong once §6.13 exists. |
 | `COLD` | `( -- )`, full reset: dictionary, bank layout, stacks, and every sysvar reinitialized exactly as at a fresh boot | **KERNEL** | See §4.6 — the contract (fresh-boot-equivalent state before the next line runs) is fixed there; no target-independent mechanism can be given here, because none exists. |
 
 **A correction, found by direct implementation, not merely reasoned
@@ -1218,6 +1228,9 @@ than re-specifying byte-for-byte:
 | `SEE` | `( "name" -- )` — decompiles a `DOCOL`-coded colon-definition back to source-ish form, special-casing `LIT`/`(SLIT)`/`BRANCH`/`0BRANCH` as inline data rather than further calls to decompile. Scoped to `DOCOL`-coded words only — `CONSTANT`/`VARIABLE`/`DOES>`'d words report "not supported" rather than guessing wrong. | `'`, `>CFA`, `XT-NAME`, `@` |
 | `HIDE` | `( "name" -- )` — sets the `HIDDEN` flag (§3) on an already-defined word's entry, found by reverse chain-walk via `>CFA` (the same technique `XT-NAME` uses). Already-compiled callers of a hidden word are unaffected (a compiled call is a raw address, not a name to re-resolve) — only future lookup and `WORDS` listings change. | `'`, `>CFA`, `@`, `C!` |
 | `FORGET` | `( "name" -- )` — removes a word *and everything defined after it*, reclaiming `DICT` space: rolls `LATEST` back to the target word's own Link Pointer and `HERE` back to its own address, the same rollback §5.5 already performs automatically on a compile error, reachable here for any named word rather than only the currently-mid-compilation one. Needs `HERE`'s *address* (`HERE-ADDR`, §6.10), the exact gap that word closed. **Known, deliberately unaddressed limitation**: forgetting a word another `VOCABULARY` branch depends on leaves that vocabulary's chain corrupted — not designed against, since nothing needs it yet. | `'`, `>CFA`, `LATEST-ADDR`, `HERE-ADDR`, `@`, `!` |
+| `ENVIRONMENT` | `( xt "name" -- )` — defines `name` as a word that switches into the environment whose step word is `xt`, claiming or re-adopting that environment's slot in the `ESCR` bank. Full contract, including the switch procedure every such word performs (save screen, repoint `ENV-CURRENT`/`ENV-ENTRY`, restore screen, set `ENV-REASON`, `WARM`): `06-ENVIRONMENTS.md` §4, §6, §7. | `CREATE`, `DOES>`, `WORD`, `CMOVE`, `REDRAW`, `CLS`, `WARM`, `BANK@` |
+| `HOME` | `( -- )` — the one `ENVIRONMENT`-style word the bootstrap layer defines itself: switches to the Forth prompt (step xt `0`). Defined after the `ESCR` bank's header is initialized, taking slot 0 (`06-ENVIRONMENTS.md` §4, §7.1). | `ENVIRONMENT`'s own machinery |
+| `ENV-STEP` / `ENV-ENTER` / `ENV-RECOVER` | `CONSTANT`s `0`/`1`/`2` — the values of the `ENV-REASON` sysvar (`06-ENVIRONMENTS.md` §5.1). | `CONSTANT` |
 | `VOCABULARY` / `USE` / `DEFINITIONS` | Branching dictionary chains, with the real classic `CONTEXT`/`CURRENT` split — **[Revised, M48 follow-up 2]** this row originally specified a single-pointer `USE` (Rebel-Sim's own M13, before a second target ever existed to disagree with it) that conflated *browsing* a vocabulary with *compiling into* one; that conflation is exactly what let a loaded screen's own words land in whichever vocabulary merely happened to be browsed, not necessarily `FORTH`. `VOCABULARY` is `CREATE`...`DOES>`-based: naming a vocabulary (typed or `EXECUTE`d) sets `CONTEXT`, a `VARIABLE` holding which vocabulary `FIND`/`WORDS` search — the real classic idiom, not a bare `CREATE`d value push. `CURRENT` (`CURRENT-VOCAB` in the reference implementation) is a second, independent `VARIABLE` holding which vocabulary `:`/`CREATE` actually extend. `USE name` is a thin `' EXECUTE` synonym — context-only, since it just runs the named vocabulary's own `DOES>` action. `DEFINITIONS ( -- )` is the explicit second step, promoting whatever `CONTEXT` currently names to also become `CURRENT` — `EDITOR DEFINITIONS` means "look here, and compile here too," not implied by browsing alone. **A real implementation trap, worth specifying explicitly so a second target doesn't rediscover it the hard way:** `FIND`/`WORDS` must **not** simply dereference `CONTEXT`'s own stored vocabulary position — that position is a snapshot, refreshed only when `DEFINITIONS` switches *away* from a vocabulary, not continuously as new words compile into it, so it goes stale the instant you're actively compiling into the very vocabulary you're also browsing (the common case). The correct rule: when `CONTEXT` and `CURRENT` name the *same* vocabulary, search `LATEST` directly (the only thing genuinely live); only when they *differ* — browsing some other, dormant vocabulary — is that vocabulary's own stored position trustworthy, precisely because nothing is compiling into it right now. Any user-facing word that itself compiles multiple, potentially interdependent lines while some other vocabulary might be merely browsed (the reference implementation's own `LOAD`, §9) needs the identical align-`CONTEXT`-with-`CURRENT`-for-the-duration treatment, for the identical reason. Vocabularies still only ever let a *later* one see an *earlier* one, never the reverse (branching, not independent chains plus a search order) — deliberately **not** how `HIDE`/decluttering is implemented, no way to make something callable-but-unlisted with vocabularies alone. Reserved for their real use case — project/cart namespace isolation — once that's a concrete need beyond the reference implementation's own `EDITOR` vocabulary (§9). | `LATEST`, `CREATE`, `DOES>`, `,`, `LATEST-ADDR` |
 
 `>CFA`/`XT-NAME` and the internal constants `SEE` needs (`LIT`'s own
@@ -1283,6 +1296,16 @@ today:
   "the process doesn't crash" — it's "the *session* recovers to a
   known-good state," which is what makes an interactive Forth prompt
   usable at all after a typo.
+- **Recovery marks itself for an active environment.** As the last
+  step of that recovery — and equally at the end of `WARM`'s own
+  unwind (§6.12), which reports nothing — the driving loop **MUST**
+  set the `ENV-REASON` sysvar to `2` (`ENV-RECOVER`) if and only if it
+  currently holds `0` (`ENV-STEP`). A value of `1` (`ENV-ENTER`) is
+  left alone: a switch between environments sets it and then calls
+  `WARM`, and must not have it overwritten. When an environment is
+  active (`ENV-ENTRY` non-zero, §5.6), "ready for its next line" above
+  means that environment's step word is the next thing executed, not
+  the Forth prompt (`06-ENVIRONMENTS.md` §5).
 - **Echoing the failing token before `ABORT`** — RECOMMENDED, not
   required. Neither of this specification's classic ancestors
   (fig-Forth, Forth-79) had `THROW`/`CATCH` at all; their entire
@@ -1322,6 +1345,11 @@ today:
 
 ## 9. Explicitly out of scope
 
+- **Floating point.** Not part of this catalog and not counted in §2's
+  totals: it is an optional wordset with its own document,
+  `07-FLOATING-POINT.md`, which follows this document's
+  KERNEL/BOOTSTRAP split and leaves `NUMBER` and `INTERPRET` (§5.4,
+  §6.13) untouched.
 - **`LOAD` / classic screen-source interpretation** — reading a
   resident `BLKS` bank's contents as Forth source (`01-HAL.md` §6.5,
   generic block storage — **[Renamed, 2026-08-18]** was `SCRS`).
@@ -1389,3 +1417,4 @@ today:
 | `COLD` reinitializes `DICT`/`MMAP`/both stacks/every sysvar to fresh-boot state before the next line runs, by whatever target-appropriate mechanism | §4.6, §6.12 |
 | The bootstrap load (§7.1) re-runs after `COLD`, exactly as at genuine first boot | §4.6, §7.1 |
 | Any uncaught error clears both stacks, reports via `hal_report_error`, and returns to a clean prompt | §8 |
+| The driving loop executes `ENV-ENTRY` when it is non-zero; recovery and `WARM` set `ENV-REASON` to `2` only when it holds `0` | §5.6, §8, `06-ENVIRONMENTS.md` §5.2 |

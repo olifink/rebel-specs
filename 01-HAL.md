@@ -827,19 +827,26 @@ below is (or should become) a synchronous Forth primitive.
   | `MMAP` | `.MAP` |
   | `WORK` | `.WRK` |
   | `BLKS` | `.BLK` |
+  | `ESCR` | `.ESC` |
+  | `BAS` | `.BAS` |
+  | `BASW` | `.BSW` |
 
   Every bank tag a conformant target's memory model defines
   (`02-MEMORY-MODEL.md`) gets an entry here — this specification does
   not special-case any tag out of the persistence mechanism. Three
   groups, by what persisting them actually buys:
 
-  - `SCRN`/`FONT`/`SPRT`/`DICT`/`DATA`/`BLKS` — ordinary content assets.
-  - `CHAR`/`KMAP`/`SYSV`/`DSTK`/`RSTK` — live session state. Together
+  - `SCRN`/`FONT`/`SPRT`/`DICT`/`DATA`/`BLKS`/`BAS` — ordinary content
+    assets (`BAS`: Rebel BASIC program text, `08-BASIC.md` §3.1).
+  - `CHAR`/`KMAP`/`SYSV`/`DSTK`/`RSTK`/`ESCR` — live session state
+    (`ESCR`: every environment's saved text screen,
+    `06-ENVIRONMENTS.md` §7). Together
     with `MMAP` (below), these are what make §8's state-portability
     claim (`FORTH-ARCHITECTURE.md` — pause a session, dump it, resume
     identically on another conformant target) an actual save/load path
     rather than a theoretical one.
-  - `MMAP`/`WORK` — see below. Included for uniformity of the
+  - `MMAP`/`WORK`/`BASW` — see below (`BASW`: Rebel BASIC's work
+    bank, which BASIC reinitializes on load, `08-BASIC.md` §10.4). Included for uniformity of the
     mechanism, not because their content is normally meaningful to
     reload.
 

@@ -56,10 +56,16 @@ It does not specify:
   flag that's easy to omit at one of many scattered call sites, not a
   requirement this specification imposes on every implementation
   regardless of its host's native endianness.
-- Floating point is out of scope for this document and this cell. A
-  target adding float support later MUST use a separate float stack
-  (standard Forth practice), never pack it into the integer cell —
-  `04-FORTH-CORE.md`'s concern if/when it happens, not decided here.
+- **A float is one cell.** The optional floating-point wordset
+  (`07-FLOATING-POINT.md`) represents a float as an IEEE 754 binary32
+  value in an ordinary cell, on the ordinary data stack. [Reversed]
+  This bullet formerly required a separate float stack, never packing
+  a float into the integer cell — standard Forth practice, which exists
+  because a float is usually wider than a cell. With a 32-bit cell and
+  a 32-bit float that reason does not apply, and a second stack would
+  add a bank, sysvars, and a duplicate set of stack words for no gain
+  (`07-FLOATING-POINT.md` §2). Nothing else about the cell changes: it
+  stays untyped, and no word in this document treats a float specially.
 - **Cell alignment**: a 4-byte-aligned offset is `offset` such that
   `offset mod 4 == 0`. Rounding an arbitrary offset up to the next
   aligned boundary is `align4(offset) = (offset + 3) & ~3`. This
@@ -343,7 +349,10 @@ to it — it is not exhaustive by design (§7).
 | `ATTR` | **REQUIRED** if display-capable. Per-cell ink/paper attribute byte (`IIIIPPPP`), same size and addressing as `CHAR`; write-through mirrors `CHAR`'s while `PALETTE-BASE` is non-zero, otherwise inert (`01-HAL.md` §3.2, §3.6) | Per-arena |
 | `WORK` | Terminal Input Buffer and scratch-text-handling region (`PAD`), at fixed sub-offsets within one bank — both are small, transient, per-line scratch text, so they share one size class instead of each independently rounding up to its own (§4.3) | Per-arena |
 | `SPRT` | Sprite/tile data | Per-arena |
+| `ESCR` | Saved text screens, one fixed slot per environment (`06-ENVIRONMENTS.md` §7). One bank, created at boot alongside `CHAR`/`ATTR` on every display-capable target with a self-hosted outer interpreter | Per-arena |
 | `CART` | Cart-loaded code landing area | Per-arena |
+| `BAS` | A Rebel BASIC program's source text, one bank per program (`08-BASIC.md` §3.1). Present only where BASIC is loaded | Per-arena |
+| `BASW` | Rebel BASIC's work bank: compiled code, variables, string space, run-time stacks (`08-BASIC.md` §10.4). Present only where BASIC is loaded | Per-arena |
 | `DATA` | General-purpose scratch | Per-arena |
 | `MMAP` | The arena's own bank table (§5) | Per-arena (each arena owns and describes only its own banks) |
 | `SCRN` | Display framebuffer | **Shared** — one physical/simulated screen, never duplicated |

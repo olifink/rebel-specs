@@ -139,6 +139,7 @@ existing one.
 | `SPRITE` | `0x100` (256) | 64 bytes | §9 |
 | `STORAGE` | `0x140` (320) | 64 bytes | §10 |
 | `FORTH` | `0x180` (384) | 64 bytes | §11 |
+| `ENV` | `0x1C0` (448) | 64 bytes | §12 |
 
 These offsets **MUST** match exactly on every conformant target — this
 is the one place in this document where a literal numeric value, not
@@ -150,8 +151,8 @@ that size for continuity with already-shipped code on every known
 reference implementation; every group after it uses the default.
 
 A `SYSV` bank sized at 4 KiB (`02-MEMORY-MODEL.md` §4.3's minimum size class)
-leaves `4096 − (16 + 48 + 64×6) = 3632` bytes genuinely unreserved past
-`FORTH`'s end — real headroom for a future group, not slack to be
+leaves `4096 − (16 + 48 + 64×7) = 3568` bytes genuinely unreserved past
+`ENV`'s end — real headroom for a future group, not slack to be
 nervous about spending (§1's "about feel, not efficiency" framing
 applies here too: even a generously padded field list measures in the
 hundreds of bytes, nowhere close to exhausting a 4 KiB bank).
@@ -207,7 +208,7 @@ owning subsystem-existence precondition.
   collide in the flat dictionary namespace (§2). Whether a *unified*,
   cross-subsystem error/exception convention (superseding today's
   per-subsystem fields entirely) is ever worth building is
-  `04-FORTH-CORE.md`'s call, not resolved here — see §12.
+  `04-FORTH-CORE.md`'s call, not resolved here — see §13.
 
 ## 6. `SCREEN`
 
@@ -312,7 +313,21 @@ rather than each picking independently. Full semantics belong to
 | 24 | `SP` | Live data stack pointer. |
 | 28 | `RP` | Live return stack pointer. |
 
-## 12. Explicitly out of scope / deferred
+## 12. `ENV`
+
+Base `0x1C0`, 64 bytes reserved. Field meanings and the values
+`ENV-REASON` takes are `06-ENVIRONMENTS.md` §5.1's job; this table
+fixes the byte layout. **REQUIRED** on every target with a self-hosted
+outer interpreter (`04-FORTH-CORE.md` §6.13), the same precondition
+`06-ENVIRONMENTS.md` §9 places on the mechanism itself.
+
+| Offset | Field | One-line meaning |
+|---|---|---|
+| 0 | `ENV-ENTRY` | Step xt of the active environment; `0` = the Forth prompt. Fresh-boot value `0`. The one field in this group native code branches on. |
+| 4 | `ENV-REASON` | Why the next step call is happening (`0` step, `1` enter, `2` recover). |
+| 8 | `ENV-CURRENT` | Address of the active environment's record. Read and written by portable code only. |
+
+## 13. Explicitly out of scope / deferred
 
 - **A generator tool keeping this document's layout, a target's C/C++
   struct, and a target's Forth constant table all in sync from one
@@ -340,7 +355,7 @@ rather than each picking independently. Full semantics belong to
   reservation only once its real field count is known to be too tight,
   not speculatively.
 
-## 13. Conformance checklist
+## 14. Conformance checklist
 
 | Requirement | Section |
 |---|---|
@@ -354,3 +369,4 @@ rather than each picking independently. Full semantics belong to
 | `PALETTE-BASE` is present (not omitted as merely optional) on every display-capable target, alongside the `PAL`/`ATTR` banks it points into | §6, `01-HAL.md` §3.6, `02-MEMORY-MODEL.md` §4.6 |
 | `SCREEN`/`KEYBOARD`/`STORAGE` field layout matches §6/§7/§10 exactly, consistent with `01-HAL.md`'s meanings | §6, §7, §10 |
 | `FORTH` group present at `0x180` with §11's field layout, once a target has a Forth executor at all | §11 |
+| `ENV` group present at `0x1C0` with §12's field layout, once a target has a self-hosted outer interpreter | §12, `06-ENVIRONMENTS.md` §5.1 |
