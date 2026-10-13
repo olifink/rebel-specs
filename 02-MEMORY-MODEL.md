@@ -155,6 +155,7 @@ Flag bits (bit-for-bit stable across every conformant target — a target
 | 2 | `SWAPPABLE` | Reserved, inert. No target has bank-swap-to-storage logic yet (§7). |
 | 3 | `DIRTY` | Reserved, inert. Paired with `SWAPPABLE` for a future "only write back what actually changed" mechanism — not built anywhere yet. |
 | 4 | `ACTIVE` | This slot in the bank table currently holds a real bank (as opposed to being available for the next allocation). Required — see §5's rationale for why occupancy is tracked this way rather than via a separately cached cursor. |
+| 5 | `REMOVED` | This bank is marked for removal (§4.9). Changes nothing while the arena's current session lasts; the bank is not saved, and is not recreated the next time the table is loaded. |
 
 ### 4.3 Standard size classes
 
@@ -213,7 +214,7 @@ there is no class above that and no escape hatch.
 
 This rule applies uniformly to every source of a bank-size request,
 including a Forth-level or host-level dynamic bank-creation
-call (`04-FORTH-CORE.md`'s `CREATE-BANK`-equivalent primitive, if a
+call (`04-FORTH-CORE.md`'s `BANK-CREATE`-equivalent primitive, if a
 target implements one), and to a resize of an *existing* bank (§4.8):
 such a call takes a *requested* byte count and **MUST** round it up to
 the smallest class that fits before carving anything, exactly like
@@ -251,7 +252,8 @@ implied or required by this model either way; keeping alignment tied to
 becomes useful on some future target.
 
 **A bank's address is fixed once created; there is no compaction and no
-reordering, ever** (§7 — no removal mechanism exists at all). Whatever
+reordering, ever** (a bank marked for removal, §4.9, stays exactly
+where it is until the table is next loaded). Whatever
 the arena's free cursor hasn't reached yet stays genuinely unallocated —
 not an implicit scratch bank, not owned by anything — available to a
 future `CreateBank`-equivalent call.
@@ -445,7 +447,10 @@ immediately after boot sees no visible color change.
   (`04-FORTH-CORE.md`), listing every active bank's `name` the same way
   `WORDS` lists dictionary entries, is a natural companion to
   `BANK@`/`BANK-SIZE` — walking `name` rather than `tag` for the same
-  "which specific one" reason.
+  "which specific one" reason. A program holding a bank's name as data
+  rather than as a token on the input line uses `(BANK-FIND)`
+  (`04-FORTH-CORE.md` §6.14), which returns the bank's slot address,
+  and `(BANK-CREATE)` to create one.
 - **`BANK@` and `BANK-SIZE` MUST both be `IMMEDIATE`, dual-mode on
   `STATE`** (found M53, Oliver, trying `: TESTING BANK@ CHAR ;`;
   `BANK-SIZE` hit the identical bug later, trying `: FOO BANK-SIZE
@@ -470,7 +475,7 @@ immediately after boot sees no visible color change.
   8-digit, zero-padded decimal serial number (e.g. `00000042`), drawn
   from a single monotonically increasing counter. This counter **MUST**
   be shared across every path that can create an anonymous bank — a
-  host-side initialization routine and a Forth-level `CREATE-BANK`-
+  host-side initialization routine and a Forth-level `BANK-CREATE`-
   equivalent primitive both draw from the *same* counter (stored in
   `MMAP`'s own header, §5, not duplicated anywhere else) specifically so
   two independently-created anonymous banks can never collide on name
@@ -512,6 +517,20 @@ the table's now-edited sizes, naturally pushing every bank created
 after the resized one forward by however much it grew (or back,
 if shrunk).
 
+**How a load recognizes a pending resize.** A project restore compares
+each saved slot's size with the size that bank was actually *created*
+with at this boot — not with the live table, which the edit has already
+changed. Any difference means the saved project needs a layout other
+than the one running, and the restore becomes a **relayout load**
+(`01-HAL.md` §6.3.1): the machine restarts and rebuilds its banks from
+the saved sizes. With no difference, the restore happens in place and
+nothing moves.
+
+`BANK-RESIZE` (`04-FORTH-CORE.md` §6.14) is the Forth word for the
+edit: it rounds the requested size to a size class and stores it. A
+direct write to the `size` cell is equivalent, provided the value
+written is itself a size class.
+
 A target that persists per-arena state expecting to resume mid-session
 (§7's project-save/restore model) **MUST** treat any such resize as
 invalidating whatever *absolute addresses* it may have separately
@@ -534,6 +553,55 @@ where every base can be recomputed together, consistently, in the same
 pass — never a standalone move of one bank while everything else stays
 put.
 
+### 4.9 Removing a bank
+
+A bank is removed the same way §4.8 resizes one: by an ordinary write
+to its descriptor that **has no effect within the current session** and
+becomes real the next time the bank table is loaded. The write sets the
+`REMOVED` flag (§4.2, bit 5), leaving `ACTIVE` set.
+
+**While the session lasts, nothing changes.** The bank keeps its
+memory, its base, its slot, and its name. It is still found by name,
+still readable and writable, and its name still cannot be given to a
+new bank. No other bank moves. This is the same guarantee, for the same
+reason, as §4.8's: whatever a running implementation has cached about
+its banks stays true.
+
+**What the flag changes is persistence:**
+
+- A `REMOVED` bank is never written as a project asset, and saving the
+  project blanks any asset file it already has there (`01-HAL.md`
+  §6.3).
+- When a saved bank table is loaded (`01-HAL.md` §6.3.1), a slot with
+  `REMOVED` set is not reconstructed. It is cleared and becomes an
+  ordinary inactive slot, free for the next allocation, and its name is
+  free again.
+- An asset file belonging to a `REMOVED` slot is not loaded, so the
+  bank cannot come back through the "no matching slot, create it
+  fresh" path.
+
+**Removal alone never moves another bank.** Unlike a resize, a pending
+removal does not force a relayout load (§4.8): on an ordinary in-place
+restore every surviving bank comes back at its recorded base. The free
+cursor is derived from the active slots that remain (§5.2), so a
+removed bank's range is reusable as soon as no remaining bank has a
+higher base; one with others above it leaves a gap. The gap closes the
+next time a relayout load happens for any reason, since that rebuilds
+every bank with the bump allocator and the removed one is not among
+them. There is still no compaction and no free list as such (§7).
+
+**Removal can be undone** until it takes effect, by clearing the flag.
+
+**`MMAP` itself MUST NOT be marked `REMOVED`**, and neither may an
+`EXTERNAL` bank, which the arena does not own. Nothing prevents marking
+any other bank, the system banks included; a project saved without its
+`SYSV` or `DICT` simply restores less of the session, the same as one
+that chose not to persist them (`01-HAL.md` §6.3).
+
+`BANK-REMOVE` and `(BANK-REMOVE)` (`04-FORTH-CORE.md` §6.14) are the
+Forth words for this. They do nothing a direct write to the `flags`
+cell would not.
+
 ## 5. `MMAP`: the arena-resident bank table
 
 Each arena's own bank table is itself a bank — tag `MMAP`, **always the
@@ -544,7 +612,7 @@ Forth-addressable arena memory, rather than as a separate host-side
 structure outside the arena entirely, is what makes two things possible
 that a host-side-only table cannot support:
 
-1. **`BANK@`/`CREATE-BANK`-style Forth primitives** (`04-FORTH-CORE.md`)
+1. **`BANK@`/`BANK-CREATE`-style Forth primitives** (`04-FORTH-CORE.md`)
    can walk and extend the table via ordinary raw address arithmetic —
    the same `@`/`!` mechanism that reads any other memory — rather than
    requiring a separate host-API surface just for bank introspection.
@@ -606,10 +674,12 @@ with different capacities.
   and taking `max(base + size)` over the active ones) — not tracked in
   a separate cursor variable that could fall out of sync with the
   table's actual contents.
-- **Slot order matches creation order**, always — allocation (§4.4)
-  always picks the lowest-indexed inactive slot, and (§7) nothing ever
-  deactivates a real bank in this version, so there is no reordering to
-  account for.
+- **Slot order matches creation order** — allocation (§4.4) always
+  picks the lowest-indexed inactive slot, and nothing deactivates a
+  bank within a session. The one exception: once a removal has taken
+  effect at a table load (§4.9), the slot it freed is reused by the
+  next bank created, which then sits ahead of older banks in slot
+  order.
 - `tag`/`name` are stored NUL-padded within their fixed field width, not
   space-padded — space-padding (if a target's storage layer needs it for
   an on-disk 8.3-style filename convention) is that layer's own
@@ -805,16 +875,17 @@ one becomes real and load-bearing somewhere, not before:
   at runtime, beyond the project-open/close-time load/save
   `01-HAL.md` §6 already covers). The `SWAPPABLE`/`DIRTY` flags exist in
   the descriptor (§4.2) but are inert placeholders.
-- **Bank removal.** No mechanism exists to deactivate or reclaim a
-  bank's slot once created — banks live for their arena's whole
-  lifetime. A consequence worth knowing about: re-opening a project
+- **In-session bank removal.** A bank can be marked for removal
+  (§4.9), but that takes effect only when the table is next loaded.
+  Within one session no mechanism deactivates a bank or reclaims its
+  slot or memory. A consequence worth knowing about: re-opening a project
   whose banks are already resident (e.g. re-mounting the same storage
   without an intervening reset) is a name-collision no-op against the
   already-resident bank, not a fresh reload — harmless (the resident
   data is already correct), but not the same as an actual reload.
 - **Bounds checking / memory protection.** Not planned at all within an
   arena — intentional (§3), not a gap.
-- **Dynamic bank allocation beyond a single `CREATE-BANK`-equivalent
+- **Dynamic bank allocation beyond a single `BANK-CREATE`-equivalent
   primitive, plus the one resize mechanism §4.8 now specifies** (a
   size-field edit, taking effect only on the next cold table
   re-derivation — never in-place). Still explicitly undesigned beyond
@@ -856,6 +927,7 @@ one becomes real and load-bearing somewhere, not before:
 | External banks are registered, don't consume the free cursor, and don't need a size class | §4.5 |
 | `@`/`!` resolution reaches an `EXTERNAL` bank's real backing store (not just the arena's own buffer) on any target where the two aren't automatically the same memory | §4.5 |
 | Bank table (`MMAP`) is arena-resident, not a host-side-only structure | §5 |
+| A `REMOVED` bank is unchanged for the rest of the session, is never saved, and is not reconstructed when its table is next loaded | §4.9 |
 | Bank `name` uniqueness is global across every arena, not per-arena | §4.7, §6.5 |
 | Auto-generated bank names share one counter (`MMAP`'s own header), regardless of creation path | §4.7, §5.1 |
 | A Forth task is bound to exactly one arena for its whole lifetime; only the *attached* arena is runtime-switchable | §6.1 |

@@ -903,12 +903,17 @@ file is present:**
    of slots, each recording a tag, a name, a base, a size class, and an
    active flag. For every active slot, reconstruct a bank at that
    slot's **exact recorded base**, not a freshly-allocated one, before
-   reading anything else in the project directory.
+   reading anything else in the project directory. A slot also marked
+   `REMOVED` (`02-MEMORY-MODEL.md` §4.9) is the exception: it is not
+   reconstructed, and is left cleared and inactive in the restored
+   table.
 2. **Content restore.** For every other recognized-extension file: if
    its (tag, basename) matches a slot phase 1 just reconstructed, load
    its payload directly into that bank's already-fixed location
    (zero-pad short payloads up to the slot's recorded size; skip
-   oversized ones, same as the size-class-mismatch rule below). If it
+   oversized ones, same as the size-class-mismatch rule below). If its
+   (tag, basename) matches a slot phase 1 skipped as `REMOVED`, skip
+   the file — it must not bring the bank back. If it
    has no match — no `MMAP` file was present at all, or this content
    file isn't represented in the one that was (an older save, or a
    target that only ever persisted a subset) — fall back to creating a
@@ -922,6 +927,33 @@ to persist `MMAP` alongside its content banks (via the same
 no special ordering requirement there, only on load) gets exact-layout
 restoration; a target that never does still round-trips correctly, just
 without the layout-fidelity guarantee.
+
+**Relayout load: the one case where phase 1 does not apply.** If the
+saved `MMAP` records, for any bank, a size different from the size that
+bank was created with at the current boot, a resize is pending
+(`02-MEMORY-MODEL.md` §4.8) and the saved layout cannot be laid over
+the running one. `openProject` then **MUST NOT** restore in place.
+Instead:
+
+1. The machine restarts, as for `COLD` (`04-FORTH-CORE.md` §4.6), and
+   creates its boot-time banks in their usual order, using the saved
+   size for each one the project records. The bump allocator places
+   them, so every base after a resized bank shifts by itself.
+2. The saved `MMAP` payload is **not** copied into the new table — its
+   bases describe the old layout. It is consulted only for sizes, and
+   for which slots are `REMOVED`.
+3. Content is restored by name as in phase 2, with the same
+   fresh-creation fallback for banks the boot sequence did not create,
+   and skipping any file that belongs to a `REMOVED` slot.
+4. Both stacks are left empty. A saved stack pointer is an absolute
+   address measured from the top of its bank and is wrong in the new
+   layout (`02-MEMORY-MODEL.md` §4.8).
+
+The comparison is against creation-time sizes, which a target therefore
+has to remember; the live table already reflects any edit and would
+always agree with what was just saved. A relayout load keeps every
+bank's contents and gives up exact layout — the price of the resize
+that asked for it.
 
 - **`listProjects()`**: every name currently under `/PROJECTS/`, via
   `hal_list_dirs`. Read-only — touches no arena/bank state, unlike
@@ -948,6 +980,15 @@ without the layout-fidelity guarantee.
   `MMAP` bank alongside whatever content banks it saves — nothing else
   about `saveAsset` changes to do this; `MMAP` is written the same way
   as any other bank.
+
+  A bank marked `REMOVED` (`02-MEMORY-MODEL.md` §4.9) is the one case
+  handled differently: `saveAsset` **MUST NOT** write its contents. A
+  save of the whole project instead **blanks** that bank's asset file
+  if one exists, by writing it with zero length — which every loader
+  already treats as a missing file (the short-read rule above), so a
+  project saved without its `MMAP` cannot resurrect the bank either.
+  No new HAL function is needed for this. A target whose storage can
+  delete a file outright MAY do that instead.
 - **`loadCart(name)` / `saveCart(name, bytes)`**: opaque single-file
   binary I/O against `/CARTS/<name>.CRT` — read this one file in, write
   this one file out, no header, no bank creation. A cart's internal
@@ -961,8 +1002,9 @@ file format (header, tag/extension table, directory convention) is
 part of this specification, not an implementation detail any one target
 is free to vary. Where a saved project includes an `MMAP` asset, this
 extends to exact layout: the reconstructed bank table's bases, size
-classes, and slot order **MUST** match the originating target's exactly,
-per §6.3.1's load order — a receiving target that instead re-derives a
+classes, and slot order **MUST** match the originating target's exactly
+(slots marked `REMOVED` excepted, and unless a pending resize makes it
+a relayout load — both §6.3.1), per §6.3.1's load order — a receiving target that instead re-derives a
 plausible-looking layout from content files alone (ignoring a present
 `MMAP` asset) is non-conformant, even if every individual bank's content
 happens to load correctly.
@@ -1181,7 +1223,8 @@ somewhere, not before:
   eventually support it. Likely a capability-gated mechanism (§2.5)
   when it lands, not assumed universal.
 - **Forth-level bank introspection/creation** (`BANK@`, `BANK-SIZE`,
-  `CREATE-BANK`). These exist as ordinary Forth primitives — looking up
+  `BANK-CREATE`, and their name-on-the-stack forms `(BANK-FIND)`/
+  `(BANK-CREATE)`, `04-FORTH-CORE.md` §6.14). These exist as ordinary Forth primitives — looking up
   a bank's base address/size by name (`02-MEMORY-MODEL.md` §4.7 —
   `name` is the real, uniqueness-backed identity; `tag` is expected to
   repeat), and carving a new one at runtime — and need no new HAL

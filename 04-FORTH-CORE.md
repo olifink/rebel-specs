@@ -154,6 +154,14 @@ comparison loop. Moving `'` to BOOTSTRAP would make the first thing
 the bootstrap loader needs depend on the last thing it can build; kept
 native, that cycle never opens.
 
+§6.14's five name-on-the-stack bank words were added after this count
+was taken and are not in it: three KERNEL (`(BANK-CREATE)`,
+`(BANK-SAVE)`, `(BANK-LOAD)`) and two BOOTSTRAP (`(BANK-FIND)`,
+`(BANK-REMOVE)`). Of the parsing bank words built on them, only
+`BANK-SAVE` and `BANK-LOAD` (formerly `BSAVE`/`BLOAD`, §6.11) were ever
+counted; `BANK@`, `BANK-SIZE`, `BANK-CREATE`, `BANK-REMOVE` and
+`BANK-RESIZE` have never been tabulated in this catalog.
+
 ---
 
 ## 3. Dictionary header layout
@@ -435,8 +443,8 @@ their spelling as a special token before `FIND` is consulted.
 ### 5.3 The shared input cursor
 
 Several words (`CREATE`, `VARIABLE`, `CONSTANT`, `S"`, `.`", `(`, `'`,
-`BANK@`, `BANK-SIZE`, `CREATE-BANK`, `PROJECT`, `RESTORE`, `BSAVE`,
-`BLOAD`, §6) need
+`BANK@`, `BANK-SIZE`, `BANK-CREATE`, `PROJECT`, `RESTORE`, `BANK-SAVE`,
+`BANK-LOAD`, §6) need
 to consume the *next raw token* directly from whatever line is
 currently being interpreted — not through dictionary lookup, a literal
 piece of text (a name, a quoted string) that has no business being
@@ -464,8 +472,8 @@ typed directly at the prompt.
 
 **Two different consumption patterns follow from this, and conflating
 them is the mistake to avoid.** A defining/utility word invoked
-*interactively* (`CREATE`, `VARIABLE`, `CONSTANT`, `CREATE-BANK`,
-`PROJECT`, `RESTORE`, `BSAVE`, `BLOAD`, `'` itself, and §7.2's
+*interactively* (`CREATE`, `VARIABLE`, `CONSTANT`, `BANK-CREATE`,
+`PROJECT`, `RESTORE`, `BANK-SAVE`, `BANK-LOAD`, `'` itself, and §7.2's
 `SEE`/`HIDE`/`FORGET`) is correctly **not** `IMMEDIATE` — it's meant to
 consume from whatever line is live *when it runs*, which is exactly
 the caller's own line, whether that word was typed directly or reached
@@ -865,11 +873,11 @@ whole grid: `CHAR!` (and everything built on it) keeps `CHAR` and the
 framebuffer synchronized automatically, but a direct `C!` into the
 `CHAR` bank (`BANK@ CHAR ...`) bypasses that write-through entirely,
 same as a storage operation overwriting `CHAR` in bulk (`RESTORE`/
-`BLOAD`, §6.11) does. There is no way to express "repaint from `CHAR`
+`BANK-LOAD`, §6.11) does. There is no way to express "repaint from `CHAR`
 without touching it" in terms of any other primitive in this
 catalog — `CHAR!` always writes `CHAR` as a side effect, which is
 precisely what needs avoiding here — so this is genuinely CORE, not an
-oversight either. **`RESTORE`/`BLOAD` (§6.11) call the same portable
+oversight either. **`RESTORE`/`BANK-LOAD` (§6.11) call the same portable
 `redraw_all()` internally**, whenever the bank they just loaded is
 `CHAR`; `REDRAW` is that exact mechanism exposed as an ordinary word so
 Forth source that pokes `CHAR` directly has its own way to
@@ -908,7 +916,12 @@ handling in Forth needs the current cursor position, which — unlike
 follow-up, not designed further here**: extend the `HERE-ADDR`/
 `LATEST-ADDR` precedent to the `CORE` group's cursor fields, then define
 `ACCEPT` in bootstrap Forth source using `KEY`/`EMIT`/`C!`/`AT-XY` and
-ordinary control flow. Once that lands, no primitive in this
+ordinary control flow. (For reading alone nothing is missing:
+`03-SYSVARS.md` §2 makes every implemented sysvar field a `CONSTANT`
+holding its address, so `CURSOR-X @` and `CURSOR-Y @` are already valid
+on any conformant target. The gap above is in what reference bootstrap
+layers have actually defined, not in this suite's contract.) Once that
+lands, no primitive in this
 specification needs to be a bespoke multi-step suspend-capable native
 op — the general principle (§4.4's suspension mechanism composes
 through ordinary Forth-source loops automatically) covers every case
@@ -944,16 +957,16 @@ reference to build against.
 
 | Word | Effect |
 |---|---|
-| `PROJECT` `SAVE` `RESTORE` `BSAVE` `BLOAD` `PROJECTS` | Direct `01-HAL.md` §6 Storage-module access — naming, saving, restoring, and listing project state. |
+| `PROJECT` `SAVE` `RESTORE` `BANK-SAVE` `BANK-LOAD` `PROJECTS` | Direct `01-HAL.md` §6 Storage-module access — naming, saving, restoring, and listing project state. |
 
 All **KERNEL** — these are the Forth-level surface of the storage HAL
-boundary itself, not derived behavior. `RESTORE`/`BLOAD` call the
+boundary itself, not derived behavior. `RESTORE`/`BANK-LOAD` call the
 portable `redraw_all()` (`01-HAL.md` §3.2, `REDRAW`'s own underlying
 mechanism, §6.9) whenever the bank they just overwrote is `CHAR`, so
 the visible screen never goes stale after a project or single-bank
 load. `SAVE` (save every active bank)
 is mechanically "loop over every bank, save it" — a future revision
-could express this as a loop over `BSAVE`-equivalent calls now that a
+could express this as a loop over `BANK-SAVE`-equivalent calls now that a
 Forth-visible bank-*enumeration* word exists (`BANKS`, §7.2 — `BANK@`
 itself still only resolves one known name, it doesn't walk the table).
 Not recommended as a change on its own — `BANKS` prints names for a
@@ -1176,6 +1189,136 @@ file that violates this ordering fails to load, the same class of
 failure §6.5's note on `>CFA`-before-`RECURSE` and §7.2's note on
 `SEE`-before-its-`HIDE`-ing already document for this specification's
 other load-order constraints.
+
+### 6.14 Banks by name
+
+**Naming.** Every bank word begins with `BANK`. Each operation comes
+in up to two forms:
+
+- **`BANK-X name`** takes the bank's name from the input line (§5.3).
+  This is the form a person types.
+- **`(BANK-X)`** takes the name from the stack as `addr len`. This is
+  the form a program uses when it holds the name as data — a BASIC
+  `LOAD "GAME"`, an editor opening a document, an environment creating
+  its own work bank. It reports failure with a zero result and never
+  calls `ABORT`.
+
+The parenthesized name marks the non-parsing word a parsing word is
+built on, the convention classic Forth uses for `(FIND)` and this
+suite's reference bootstrap layer already uses for `(BLOCK-READ)`.
+`BANK@` and `BANKS` keep their established short names.
+
+[Renamed] Three words were spelled differently in earlier revisions of
+this suite and in reference implementations: `CREATE-BANK` is now
+`BANK-CREATE`, `BSAVE` is `BANK-SAVE`, and `BLOAD` is `BANK-LOAD`.
+Their behavior is unchanged.
+
+| Word | Effect | | Notes |
+|---|---|---|---|
+| `(BANK-FIND)` | `( addr len -- slot \| 0 )` | BOOTSTRAP | Finds the active bank with that name and returns the address of its slot in the bank table; `0` if there is none. A walk of `MMAP`'s slot table by address arithmetic, the same one `BANKS` (§7.2) makes. |
+| `(BANK-CREATE)` | `( name-addr name-len tag-addr tag-len size -- slot \| 0 )` | **KERNEL** | Creates a bank and returns its slot; `0` on any failure. See below. |
+| `(BANK-SAVE)` | `( addr len -- flag )` | **KERNEL** | Writes the named bank to the open project as one asset (`01-HAL.md` §6.3's `saveAsset`). `FALSE` if there is no such bank, it is marked `REMOVED`, no project is open, or the write fails. |
+| `(BANK-LOAD)` | `( addr len -- slot \| 0 )` | **KERNEL** | Loads the open project's asset with that basename into a bank of that name, and returns its slot. See below. |
+| `(BANK-REMOVE)` | `( addr len -- flag )` | BOOTSTRAP | Marks the named bank for removal by setting `REMOVED` in its slot's `flags` cell. `FALSE` if there is no such bank, or it is `MMAP` or `EXTERNAL`. See below. |
+
+**What a slot is.** The returned address points at one 24-byte bank
+descriptor (`02-MEMORY-MODEL.md` §4.2, §5.2), and its fields are read
+with ordinary fetches — there are no accessor words:
+
+| Offset | Field |
+|---|---|
+| 0 | `tag`, 4 bytes |
+| 4 | `name`, 8 bytes |
+| 12 | `base`, 1 cell |
+| 16 | `size`, 1 cell |
+| 20 | `flags`, 1 cell |
+
+So `S" SPRITES" (BANK-FIND) 12 + @` is the base address of the bank
+`SPRITES`. No bank has a slot at address `0` (the table's header is
+there), which is what makes `0` usable as "none".
+
+**Names.** A name is 1 to 8 characters. Every word in this section
+folds `a`–`z` to upper case before comparing or storing it, matching
+dictionary names (§3) and the names `openProject` gives loaded assets
+(`01-HAL.md` §6.3). `(BANK-CREATE)` accepts a zero-length name and then
+assigns the next automatic serial name (`02-MEMORY-MODEL.md` §4.7). A
+name longer than 8 characters finds nothing and creates nothing.
+
+**`(BANK-CREATE)`** carves a bank exactly as `02-MEMORY-MODEL.md` §4.3–§4.4
+describe: `size` is rounded up to a size class, the bank is placed by
+the bump allocator in the lowest inactive slot, and its `ACTIVE` flag
+is set. The new bank's contents **MUST** be zero. `tag` is 1 to 4
+characters, stored NUL-padded as given. It returns `0`, changing
+nothing, if:
+
+- a bank of that name already exists, in this arena or any other
+  (`02-MEMORY-MODEL.md` §4.7);
+- no slot is free, or the arena has no room for the size class;
+- the name or tag is too long, the tag is empty, or `size` is `0` or
+  exceeds the largest class.
+
+It is KERNEL because name uniqueness spans every arena, which one
+arena's own table cannot check, and because a target is free to keep
+its own record of each bank it has created (`02-MEMORY-MODEL.md` §4.8)
+that a Forth-source table edit would bypass. A caller that wants
+"create unless it exists" calls `(BANK-FIND)` first.
+
+**`(BANK-REMOVE)`** is `(BANK-FIND)` plus one store: it ORs bit 5 into the
+cell at slot + 20. Per `02-MEMORY-MODEL.md` §4.9 that changes nothing
+for the rest of the session — the bank stays resident, addressable,
+and findable, and its name stays taken — and takes effect when the
+bank table is next loaded: the bank is not saved, not recreated, and
+its slot and name become free. Removing an already-`REMOVED` bank
+succeeds and changes nothing. Clearing the bit again by hand undoes it.
+
+`BANK-RESIZE` is the resize of `02-MEMORY-MODEL.md` §4.8: it changes
+one cell of the bank table and nothing else. For the rest of the
+session `BANK-SIZE` reports the new value while every running
+subsystem keeps the size it started with; the new size becomes real
+when the project is saved and next restored, which restarts the
+machine with the new layout (`01-HAL.md` §6.3.1). It has no
+parenthesized form, since for a caller holding a slot it is a single
+store. Not `IMMEDIATE`.
+
+There is still no way to remove or grow a bank *within* a session
+(`02-MEMORY-MODEL.md` §4.8, §4.9). A program that creates banks freely
+will run out of slots before its next cold start.
+
+**`(BANK-LOAD)`** looks in the open project's directory for the asset
+whose basename is the given name; bank names are unique, so at most one
+file of a project saved by a conformant target matches. Its extension
+gives the tag (`01-HAL.md` §6.3). If a bank of that name is already
+resident, the payload replaces its contents, zero-padded to the bank's
+size, and a payload larger than the bank fails. Otherwise a bank is
+created for it as `openProject` would. It returns `0` if no project is
+open, no asset matches, the header is bad, or the bank cannot be
+created or is too small. Loading `CHAR` redraws the screen (§6.11).
+
+**Timing.** `(BANK-SAVE)` and `(BANK-LOAD)` reach the storage HAL, which
+may take real time (`01-HAL.md` §6.2). They are explicit save and load
+actions in that section's sense, and a target suspends the interpreter
+across them, and across their parsing forms, by one mechanism.
+
+**The parsing words are these, plus `WORD`.** A target **MAY** define
+them in Forth source over this section; whether it does or keeps them
+native, their behavior **MUST** match:
+
+| Parsing word | Equivalent to |
+|---|---|
+| `BANK@ name` | `BL WORD (BANK-FIND)`, `ABORT` if `0`, else the cell at slot + 12 — pushed, or compiled as a `LIT` when compiling (`02-MEMORY-MODEL.md` §4.7) |
+| `BANK-SIZE name` | The same, with the cell at slot + 16 |
+| `BANK-SAVE name` | `BL WORD (BANK-SAVE)`, `ABORT` if `FALSE` |
+| `BANK-LOAD name` | `BL WORD (BANK-LOAD)`, `ABORT` if `0` |
+| `BANK-REMOVE name` | `BL WORD (BANK-REMOVE)`, `ABORT` if `FALSE` |
+| `BANK-RESIZE name` | `( new-size "name" -- )` — `BL WORD (BANK-FIND)`; `ABORT` if `0`, if the bank is `MMAP`, or if `new-size` exceeds the largest size class; otherwise round `new-size` up to a size class and store it in the cell at slot + 16 |
+| `BANK-CREATE tag` | `( size "tag" -- addr )` — `BL WORD` for the tag, then `(BANK-CREATE)` with a zero-length name and that tag and size; `ABORT` if `0`, else the new bank's base address (the cell at slot + 12) |
+
+`BANK-CREATE` creates an **anonymous** bank: it takes a tag, not a
+name, and the bank gets the next automatic serial name
+(`02-MEMORY-MODEL.md` §4.7). It returns the base address directly, so
+the usual idiom is `4096 BANK-CREATE DATA CONSTANT MYBUF`. It is not
+`IMMEDIATE` — it consumes its tag from whatever line is live when it
+runs (§5.3). Creating a bank under a chosen name is `(BANK-CREATE)`'s job.
 
 ---
 
@@ -1416,5 +1559,6 @@ today:
 | Every §6 BOOTSTRAP-marked word, plus §7.2's library words, is defined and loaded before the first interactive prompt | §7.1 |
 | `COLD` reinitializes `DICT`/`MMAP`/both stacks/every sysvar to fresh-boot state before the next line runs, by whatever target-appropriate mechanism | §4.6, §6.12 |
 | The bootstrap load (§7.1) re-runs after `COLD`, exactly as at genuine first boot | §4.6, §7.1 |
+| `(BANK-FIND)`/`(BANK-CREATE)`/`(BANK-SAVE)`/`(BANK-LOAD)`/`(BANK-REMOVE)` exist with §6.14's stack effects and failure results (`0`/`FALSE`, never `ABORT`); the parsing bank words behave as their §6.14 equivalents | §6.14 |
 | Any uncaught error clears both stacks, reports via `hal_report_error`, and returns to a clean prompt | §8 |
 | The driving loop executes `ENV-ENTRY` when it is non-zero; recovery and `WARM` set `ENV-REASON` to `2` only when it holds `0` | §5.6, §8, `06-ENVIRONMENTS.md` §5.2 |

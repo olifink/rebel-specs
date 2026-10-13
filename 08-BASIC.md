@@ -61,7 +61,8 @@ the rest of the suite. It does not define a full-screen program editor
 
 - The environment mechanism (`06-ENVIRONMENTS.md`).
 - The floating-point wordset (`07-FLOATING-POINT.md`), in full.
-- A few Forth-level capabilities the suite does not yet specify (§14).
+- The name-on-the-stack bank words (`04-FORTH-CORE.md` §6.14).
+- Two things the suite does not yet specify (§14).
 
 ### 2.3 Why the compiled code needs no kernel support
 
@@ -362,9 +363,9 @@ stale.
 | Statement | Meaning |
 |---|---|
 | `NEW` | Empty the current program's text and `CLEAR`. |
-| `NEW "name"` | Create an empty program bank of that name and make it current. |
-| `LOAD "name"` | Make that program current, loading it from the open project if it is not resident. Implies `CLEAR`. |
-| `SAVE` | Write the current program to the open project. |
+| `NEW "name"` | Make the program of that name current and empty, creating its bank if there is none. No free bank slot or no room: `4 Out of memory`. |
+| `LOAD "name"` | Make that program current, loading it from the open project if it is not resident. Implies `CLEAR`. No such program, or a bank of that name that is not a `BAS` bank: `C Nonsense in BASIC`. |
+| `SAVE` | Write the current program to the open project. No project open, or the write fails: `C Nonsense in BASIC`. |
 | `CAT` | List the resident programs. |
 | `CALL "word" [, arg …]` | Call a Forth word (§12). |
 
@@ -442,9 +443,18 @@ At the prompt, break discards the line being typed.
   includes every resident program without BASIC being involved.
 - `SAVE` and `LOAD` act on single program banks within the open
   project. There are no file names or paths in BASIC.
-- A new program bank starts at 16 KiB. When text outgrows it, the bank
-  is resized (`02-MEMORY-MODEL.md` §4.8); if that fails, the edit is
-  refused with `4 Out of memory`.
+- A new program bank is created at 16 KiB with `(BANK-CREATE)`
+  (`04-FORTH-CORE.md` §6.14) and cannot grow within a session: an edit
+  that would overflow it is refused with `4 Out of memory`.
+  `BANK-RESIZE` from the Forth prompt enlarges it for next time: the
+  new size applies once the project is saved and restored
+  (`02-MEMORY-MODEL.md` §4.8).
+- A bank is never removed within a session (`02-MEMORY-MODEL.md`
+  §4.9), so every program created keeps its slot until the next cold
+  start. `NEW "name"` on an existing program empties and reuses its
+  bank. A program is discarded for good with
+  `USR%("(BANK-REMOVE)", "name")`, which drops it from the project at the
+  next save.
 - BASIC starts with a current program named `PROGRAM`, creating it if
   it is not resident.
 
@@ -612,17 +622,18 @@ corresponding Forth words are specified, programs use `CALL`.
 
 ## 14. What this needs that the suite does not yet specify
 
-BASIC cannot be implemented from the suite as it stands without these.
-Each is small; none is designed here.
+BASIC cannot be fully implemented from the suite as it stands without
+these. Neither is designed here.
 
 | Need | Why | Today |
 |---|---|---|
-| Find a bank by a name held as `addr len` | `LOAD`, `BANK%`, selecting a program | `BANK@` parses its name from the input line |
-| Create a bank from Forth code, given name, tag, and size | `NEW "name"`, the work bank | `CREATE-BANK` is named in `04-FORTH-CORE.md` but has no contract |
-| Save and load one bank by name from Forth code | `SAVE`, `LOAD` | `BSAVE`/`BLOAD` parse their names |
-| Read the cursor column from Forth | `PRINT`'s comma zones and `TAB` | `04-FORTH-CORE.md` §6.9 notes `CURSOR-X` has no Forth-visible address |
 | The elementary-function source | `SIN`, `LN`, `^`, … | `07-FLOATING-POINT.md` §8 |
 | MEMO's hand-over contract | `EDIT` | MEMO is unspecified |
+
+Everything else BASIC uses is specified: bank lookup, creation, and
+single-bank save and load by name (`04-FORTH-CORE.md` §6.14), and the
+cursor position as the `CURSOR-X`/`CURSOR-Y` sysvar constants
+(`03-SYSVARS.md` §2, §5).
 
 ## 15. Differences from the prototype
 
