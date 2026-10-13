@@ -157,7 +157,8 @@ native, that cycle never opens.
 §6.14's five name-on-the-stack bank words were added after this count
 was taken and are not in it: three KERNEL (`(BANK-CREATE)`,
 `(BANK-SAVE)`, `(BANK-LOAD)`) and two BOOTSTRAP (`(BANK-FIND)`,
-`(BANK-REMOVE)`). Of the parsing bank words built on them, only
+`(BANK-REMOVE)`); nor are §6.9's `EKEY`/`EKEY?` or §6.15's `EVALUATE`,
+all KERNEL. Of the parsing bank words built on them, only
 `BANK-SAVE` and `BANK-LOAD` (formerly `BSAVE`/`BLOAD`, §6.11) were ever
 counted; `BANK@`, `BANK-SIZE`, `BANK-CREATE`, `BANK-REMOVE` and
 `BANK-RESIZE` have never been tabulated in this catalog.
@@ -287,6 +288,9 @@ encountered malformed compiled data and should treat it as an error,
 not attempt to define a meaning for it.
 
 ### 4.3 Primitives that need loop-local access
+
+`EKEY` (§6.9) is treated exactly as `KEY` is here, against the keyboard
+queue instead of the channel.
 
 `KEY` is dispatched specially, not because its own behavior differs,
 but because of *when* it may need to suspend (§4.4): a conformant
@@ -854,6 +858,7 @@ carrying it alongside a now-redundant bootstrap definition.
 |---|---|
 | `EMIT` `CR` `CHAR!` `CHAR@` `CLS` `AT-XY` `INK` `PAPER` | Screen (`01-HAL.md` §3). |
 | `KEY?` `KEY` | Non-blocking poll / blocking read via the bound channel (`01-HAL.md` §4, §5). |
+| `EKEY?` `EKEY` | Non-blocking poll / blocking read of the next raw key press, straight from the keyboard queue (`01-HAL.md` §4.3). See below. |
 | `CURSEN` `CURSDIS` | Visible-cursor show/hide (`01-HAL.md` §3.5). |
 | `REDRAW` | `( -- )`, repaint the whole framebuffer from `CHAR`'s current content (`01-HAL.md` §3.2's `redraw_all()`). |
 
@@ -867,6 +872,31 @@ there's no other Forth-visible way to invoke a glyph redraw, so a
 Forth-source version that only flipped `CURSOR-VISIBLE` would leave the
 screen stale until the next unrelated cursor move. Genuinely CORE, not
 an oversight.
+
+**`EKEY`** — `( -- event )` — exists because `KEY` cannot see most of
+a keyboard: a key with no character (an arrow, Esc, a function key) has
+no byte to put in a channel, and a character key gives no way to tell
+Shift-Enter from Enter. `EKEY` returns the next key **press** as one
+cell:
+
+| Bits | Contents |
+|---|---|
+| 0–7 | `usage_code` (`01-HAL.md` §4.2) |
+| 8–15 | Modifier bitmask at the time of the press (`01-HAL.md` §4.4) |
+| 16–23 | Translated character, `0` if the key has none |
+
+Key releases and modifier-only events (`usage_code` `0x80`–`0x87`) are
+consumed and skipped; a modifier is seen only through bits 8–15 of the
+next real key. `EKEY?` — `( -- flag )` — is `TRUE` if `EKEY` would
+return at once.
+
+`EKEY` reads the keyboard, not the bound channel, so it sees nothing
+from a remote session; a program that must work over one uses `KEY`.
+The two share the single keyboard queue (`01-HAL.md` §4.3), so a key
+taken by one is gone for the other. `EKEY` blocks by the same
+suspension `KEY` uses (§4.3, §4.4), waiting on the keyboard queue
+where `KEY` waits on the channel. The names and the split follow ANS
+Forth's `EKEY`.
 
 `REDRAW` exists for the same underlying reason, generalized to the
 whole grid: `CHAR!` (and everything built on it) keeps `CHAR` and the
@@ -1320,6 +1350,38 @@ the usual idiom is `4096 BANK-CREATE DATA CONSTANT MYBUF`. It is not
 `IMMEDIATE` — it consumes its tag from whatever line is live when it
 runs (§5.3). Creating a bank under a chosen name is `(BANK-CREATE)`'s job.
 
+### 6.15 Interpreting text held in memory
+
+| Word | Effect | |
+|---|---|---|
+| `EVALUATE` | `( addr len -- )` | **KERNEL** |
+
+`EVALUATE` interprets `len` characters at `addr` exactly as if they had
+been typed as one line: it makes that text the current input line,
+puts the shared input cursor (§5.3) at its start, and runs `INTERPRET`
+(§5.6). When the text is exhausted it restores the input line and
+cursor it found, so the rest of the line that called it carries on.
+
+- `STATE` is not touched on entry or exit. Text may open and close a
+  definition; one left open stays open for whatever is interpreted
+  next.
+- It nests: evaluated text may itself call `EVALUATE`.
+- The text is read in place and **MUST NOT** be modified or moved while
+  it is being interpreted.
+- An error inside it is an ordinary error (§8). Recovery returns to the
+  top level, and the input line that was to be restored is abandoned
+  with everything else.
+
+It is KERNEL under §2.2's rule 3, since redirecting the input cursor is
+not expressible through the stack. A target **MAY** provide only the
+redirection natively and define `EVALUATE` in Forth source around
+`INTERPRET` — the reference bootstrap layer's block `LOAD` (§9) is
+built that way on a `(SET-INPUT)` primitive.
+
+This is what lets a program run text it holds as data: MEMO executing
+the line under the cursor (`09-MEMO.md` §6), or a loader feeding an
+environment's source one line at a time.
+
 ---
 
 ## 7. The bootstrap layer
@@ -1560,5 +1622,6 @@ today:
 | `COLD` reinitializes `DICT`/`MMAP`/both stacks/every sysvar to fresh-boot state before the next line runs, by whatever target-appropriate mechanism | §4.6, §6.12 |
 | The bootstrap load (§7.1) re-runs after `COLD`, exactly as at genuine first boot | §4.6, §7.1 |
 | `(BANK-FIND)`/`(BANK-CREATE)`/`(BANK-SAVE)`/`(BANK-LOAD)`/`(BANK-REMOVE)` exist with §6.14's stack effects and failure results (`0`/`FALSE`, never `ABORT`); the parsing bank words behave as their §6.14 equivalents | §6.14 |
+| `EKEY` returns key presses only, packed as §6.9 specifies, and suspends as `KEY` does; `EVALUATE` restores the caller's input line and cursor | §6.9, §6.15 |
 | Any uncaught error clears both stacks, reports via `hal_report_error`, and returns to a clean prompt | §8 |
 | The driving loop executes `ENV-ENTRY` when it is non-zero; recovery and `WARM` set `ENV-REASON` to `2` only when it holds `0` | §5.6, §8, `06-ENVIRONMENTS.md` §5.2 |

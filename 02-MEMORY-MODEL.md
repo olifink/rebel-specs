@@ -353,7 +353,8 @@ to it — it is not exhaustive by design (§7).
 | `SPRT` | Sprite/tile data | Per-arena |
 | `ESCR` | Saved text screens, one fixed slot per environment (`06-ENVIRONMENTS.md` §7). One bank, created at boot alongside `CHAR`/`ATTR` on every display-capable target with a self-hosted outer interpreter | Per-arena |
 | `CART` | Cart-loaded code landing area | Per-arena |
-| `BAS` | A Rebel BASIC program's source text, one bank per program (`08-BASIC.md` §3.1). Present only where BASIC is loaded | Per-arena |
+| `MEMO` | A MEMO document: a page bank of screen-sized text pages, one bank per document (`09-MEMO.md` §3). Present only where MEMO is loaded | Per-arena |
+| `BAS` | A Rebel BASIC program's source text, one bank per program, in the page bank format (`08-BASIC.md` §3.1, `09-MEMO.md` §3). Present only where BASIC is loaded | Per-arena |
 | `BASW` | Rebel BASIC's work bank: compiled code, variables, string space, run-time stacks (`08-BASIC.md` §10.4). Present only where BASIC is loaded | Per-arena |
 | `DATA` | General-purpose scratch | Per-arena |
 | `MMAP` | The arena's own bank table (§5) | Per-arena (each arena owns and describes only its own banks) |

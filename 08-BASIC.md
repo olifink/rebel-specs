@@ -41,8 +41,8 @@ the rest of the suite. It does not define a full-screen program editor
                                      Forth inner loop
 ```
 
-- **Source is text.** A program is plain text in a bank (§3.1). There
-  is no tokenized line format.
+- **Source is text.** A program is plain text in a bank, in the same
+  page format MEMO edits (§3.1). There is no tokenized line format.
 - **`RUN` compiles.** The whole program is translated to token-threaded
   Forth code (`04-FORTH-CORE.md` §4), which the ordinary inner loop
   then executes. There is no second interpreter and no per-statement
@@ -83,15 +83,18 @@ A program is one bank, tag **`BAS`**, named for the program (up to 8
 characters, `02-MEMORY-MODEL.md` §4.7). Several may be resident; one is
 **current** (§9).
 
-- Text starts at offset 0: lines of bytes, each ended by `0x0A`.
-- A `0x00` byte ends the text. The rest of the bank is unused.
-- Bytes are character codes as the screen displays them
-  (`10-FONT-CODES.md`); there is no other encoding.
-- A line is at most 255 bytes, not counting its terminator.
+It is a **page bank** (`09-MEMO.md` §3): a 32-byte header, then pages
+of `cols × rows` characters with no line terminators. That document
+owns the format; what BASIC adds is how it reads one.
 
-This is meant to be the same plain-text bank format MEMO edits. When
-MEMO's specification exists it owns the format and this section defers
-to it.
+- **A program line is one row of a page**, with trailing spaces
+  ignored. Rows are read top to bottom, page after page.
+- A line is therefore at most `cols` characters. There is no
+  continuation onto the next row (`09-MEMO.md` §10).
+- BASIC reads a program of any geometry. It creates programs in the
+  current screen's geometry, so that MEMO can edit them.
+- BASIC increments the header's `revision` whenever it changes program
+  text, and reads it to learn that MEMO has (§10.1).
 
 ### 3.2 Lines, statements, labels
 
@@ -126,18 +129,33 @@ and never rewritten.
 Two routes, both writing the same program bank:
 
 - **Numbered-line entry at the prompt.** A line typed at the BASIC
-  prompt that begins with a number is not executed. It replaces the
-  program line with that number; or, if there is none, is inserted
-  before the first numbered line with a greater number, or at the end
-  if there is no such line. A number with nothing after it deletes that
-  line. Unnumbered lines are never moved by this.
-- **The editor.** `EDIT` hands the current program to the full-screen
-  editor environment (MEMO). The hand-over is specified with MEMO; a
-  machine without it reports `C Nonsense in BASIC`.
+  prompt that begins with a number is not executed; it is stored.
+  - If a program line has that number, the typed line replaces it in
+    place.
+  - Otherwise it goes before the first numbered line with a greater
+    number, or after the last non-blank row if there is none. If the
+    row just above that spot is blank, the line is written there.
+    If not, room is made: the rows from that spot down to the next
+    blank row each move down one, across page boundaries, and the
+    blank row absorbs the shift. Rows beyond that blank row do not
+    move.
+  - If there is no blank row before the end of the program, a page is
+    added. With the bank at capacity the line is refused with
+    `4 Out of memory`.
+  - A number with nothing after it blanks that line's row. Nothing
+    moves to close the gap.
+  - A typed line longer than `cols` is refused with
+    `C Nonsense in BASIC`.
+- **The editor.** `EDIT` lends the current program to MEMO as
+  `09-MEMO.md` §9 describes: it opens the program there and switches
+  to it. Typing `BASIC` in MEMO returns. On a machine without MEMO
+  loaded, `EDIT` reports `C Nonsense in BASIC`.
 
-Any change to the program text marks the compiled program **stale**
-(§10.1). Text is not syntax-checked when entered; errors are found
-when the program is next compiled.
+Unnumbered lines are never moved by numbered-line entry except as part
+of the shift just described, which keeps their order.
+
+Text is not syntax-checked when entered; errors are found when the
+program is next compiled.
 
 ## 4. Types and values
 
@@ -349,9 +367,9 @@ no run-time state, so jumping out of one with `GOTO` is harmless.
 | `BREAK target [, target …]` | Set breakpoints; the program stops before each such line. |
 | `BREAK OFF` | Remove all breakpoints. |
 | `VARS` | List every variable and array with its type, size, and value. |
-| `LIST [from] [TO [to]]` | Show the program text, or the numbered range. Pauses for a key each screenful. |
-| `DELETE from [TO [to]]` | *Prompt only.* Remove the numbered lines in the range. |
-| `EDIT` | *Prompt only.* Open the program in the editor (§3.5). |
+| `LIST [from] [TO [to]]` | Show the program's non-blank lines, or the numbered range. Pauses for a key each screenful. |
+| `DELETE from [TO [to]]` | *Prompt only.* Blank the rows of the numbered lines in the range. |
+| `EDIT [target]` | *Prompt only.* Open the program in MEMO (§3.5), at the target line if one is given. |
 | `EXIT` | Leave BASIC for the Forth prompt (§13). |
 
 Typed at the prompt, `GOTO` and `GOSUB` start the program at the target
@@ -362,7 +380,7 @@ stale.
 
 | Statement | Meaning |
 |---|---|
-| `NEW` | Empty the current program's text and `CLEAR`. |
+| `NEW` | Reduce the current program to one blank page and `CLEAR`. |
 | `NEW "name"` | Make the program of that name current and empty, creating its bank if there is none. No free bank slot or no room: `4 Out of memory`. |
 | `LOAD "name"` | Make that program current, loading it from the open project if it is not resident. Implies `CLEAR`. No such program, or a bank of that name that is not a `BAS` bank: `C Nonsense in BASIC`. |
 | `SAVE` | Write the current program to the open project. No project open, or the write fails: `C Nonsense in BASIC`. |
@@ -444,8 +462,9 @@ At the prompt, break discards the line being typed.
 - `SAVE` and `LOAD` act on single program banks within the open
   project. There are no file names or paths in BASIC.
 - A new program bank is created at 16 KiB with `(BANK-CREATE)`
-  (`04-FORTH-CORE.md` §6.14) and cannot grow within a session: an edit
-  that would overflow it is refused with `4 Out of memory`.
+  (`04-FORTH-CORE.md` §6.14), with one blank page, and cannot grow
+  within a session: an edit needing a page beyond its capacity is
+  refused with `4 Out of memory`.
   `BANK-RESIZE` from the Forth prompt enlarges it for next time: the
   new size applies once the project is saved and restored
   (`02-MEMORY-MODEL.md` §4.8).
@@ -474,7 +493,11 @@ work bank:
 
 A program is compiled when it is **stale** and something needs to run
 it: `RUN`, or `GOTO`/`GOSUB` from the prompt. It becomes stale whenever
-its text changes or another program is made current.
+another program is made current, or the program bank's `revision`
+(§3.1) differs from the value recorded at the last compile. The second
+test covers every way text can change — numbered-line entry, `DELETE`,
+MEMO, or a Forth word writing the bank — without BASIC having to be
+told.
 
 **Variables survive recompilation.** The symbol table and variable
 storage are separate from compiled code, and compiling only adds to
@@ -549,8 +572,8 @@ Every command and program ends with a report:
 ```
 
 The position is given when a program statement was executing. `<line>`
-is the line's number if it has one, otherwise `#` and its position in
-the text counting from 1. `<statement>` counts from 1 within the line.
+is the line's number if it has one, otherwise `#` and its row counted
+from 1 at the top of the first page, blank rows included. `<statement>` counts from 1 within the line.
 A compile error gives `<line>:<column>`.
 
 | Code | Message | When |
@@ -622,18 +645,14 @@ corresponding Forth words are specified, programs use `CALL`.
 
 ## 14. What this needs that the suite does not yet specify
 
-BASIC cannot be fully implemented from the suite as it stands without
-these. Neither is designed here.
-
-| Need | Why | Today |
-|---|---|---|
-| The elementary-function source | `SIN`, `LN`, `^`, … | `07-FLOATING-POINT.md` §8 |
-| MEMO's hand-over contract | `EDIT` | MEMO is unspecified |
+One thing remains: the elementary-function source that `SIN`, `LN`,
+`^` and the rest are defined by (`07-FLOATING-POINT.md` §8).
 
 Everything else BASIC uses is specified: bank lookup, creation, and
-single-bank save and load by name (`04-FORTH-CORE.md` §6.14), and the
+single-bank save and load by name (`04-FORTH-CORE.md` §6.14); the
 cursor position as the `CURSOR-X`/`CURSOR-Y` sysvar constants
-(`03-SYSVARS.md` §2, §5).
+(`03-SYSVARS.md` §2, §5); and the page bank format and editor
+hand-over (`09-MEMO.md` §3, §9).
 
 ## 15. Differences from the prototype
 
@@ -642,6 +661,7 @@ cursor position as the `CURSOR-X`/`CURSOR-Y` sysvar constants
 | Tokenized lines interpreted at run time | Text compiled to Forth threaded code at `RUN` | One execution engine; Forth speed |
 | One numeric type, 64-bit double | Float is 32-bit; integer `%` type added | The cell is 32 bits; integers run at full speed |
 | Lines must be numbered, stored in numeric order | Numbers optional, `@labels` added, order is text order | The machine has a full-screen editor |
+| Lines of any length in a line store | A line is one screen row of a page bank | Programs are MEMO documents |
 | Syntax checked as each line is entered | Checked at compile time | Text may arrive from the editor |
 | Keywords rewritten to upper case; variables case-sensitive | Text stored as typed; everything case-insensitive | One rule, matching the Forth dictionary |
 | String variables are one letter plus `$` | Any name plus `$` | No reason for the limit |

@@ -829,6 +829,7 @@ below is (or should become) a synchronous Forth primitive.
   | `BLKS` | `.BLK` |
   | `ESCR` | `.ESC` |
   | `BAS` | `.BAS` |
+  | `MEMO` | `.MEM` |
   | `BASW` | `.BSW` |
 
   Every bank tag a conformant target's memory model defines
@@ -836,8 +837,9 @@ below is (or should become) a synchronous Forth primitive.
   not special-case any tag out of the persistence mechanism. Three
   groups, by what persisting them actually buys:
 
-  - `SCRN`/`FONT`/`SPRT`/`DICT`/`DATA`/`BLKS`/`BAS` — ordinary content
-    assets (`BAS`: Rebel BASIC program text, `08-BASIC.md` §3.1).
+  - `SCRN`/`FONT`/`SPRT`/`DICT`/`DATA`/`BLKS`/`BAS`/`MEMO` — ordinary
+    content assets (`BAS`: Rebel BASIC program text, `08-BASIC.md`
+    §3.1; `MEMO`: MEMO documents, `09-MEMO.md` §3).
   - `CHAR`/`KMAP`/`SYSV`/`DSTK`/`RSTK`/`ESCR` — live session state
     (`ESCR`: every environment's saved text screen,
     `06-ENVIRONMENTS.md` §7). Together
@@ -1042,6 +1044,10 @@ only to targets without a self-hosted outer interpreter at all yet.
 conformant target actually needing it — worth stating explicitly since
 §6.3's own rule normally has a target choose and document an extension
 only once it exists.
+
+MEMO (`09-MEMO.md` §3.4) is this suite's specified editor for these
+screens: it edits a `BLKS` bank in place, 64 columns × 16 rows per
+block, and `n EDIT` opens block `n` in it.
 
 A screen/block editor built on `BLKS` displays a block's contents by
 copying its bytes into `CHAR` in bulk (one `BLKS` block's worth of text
