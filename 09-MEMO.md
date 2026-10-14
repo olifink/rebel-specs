@@ -194,6 +194,7 @@ spaces.
 |---|---|
 | Shift-Space | **Insert a space** at the cursor. The character under the cursor and everything to its right move one cell right; the line's last character is lost. The cursor does not move. *(On a blank line this key splits the page instead — §5.2.)* |
 | Delete | **Delete the character** under the cursor. Everything to its right moves one cell left and a space enters at the right margin. The cursor does not move. |
+| Shift-Delete | **Clear to the end of the line**: the character under the cursor and everything to its right become spaces. The cursor does not move. |
 | Shift-Backspace | Away from column 0: the same as Delete. At column 0: **join** this line to the one above (§4.4). |
 
 ### 4.4 Splitting and joining lines
@@ -271,6 +272,11 @@ MEMO has no command language and no command line. **Shift-Esc executes
 the line the cursor is on as Forth**, and that is the whole command
 system: a command is typed into the document, wherever there is a line
 for it, and run from there.
+
+**Shift-Esc on a blank line leaves MEMO.** It commits the page and
+switches to the home environment, exactly as executing `HOME` from a
+line would, but with nothing written to the page: no output and no
+status.
 
 ### 6.1 What the user sees
 
@@ -380,7 +386,7 @@ These are in the `FORTH` vocabulary once MEMO is loaded.
 
 | Word | Effect |
 |---|---|
-| `MEMO` | `( -- )` — enter the editor on the current document, at its recorded page and cursor. |
+| `MEMO` | `( -- )` — enter the editor on the current **page document**, at its recorded page and cursor. Never on a block bank: see below. |
 | `MEMO-OPEN name` | `( "name" -- )` — make the named bank the current document, then, if MEMO is the active environment, show it. `ABORT` if it cannot be opened. |
 | `(MEMO-OPEN)` | `( addr len -- flag )` — the same with the name on the stack; `FALSE` instead of `ABORT`. Never enters MEMO. |
 | `EDIT` | `( n -- )` — edit Forth screen `n`: make the bank named `BLKS` the current document at block `n`, cursor at the top left, and enter MEMO. `ABORT` if there is no such bank or no such block, or the screen is smaller than 64 × 16. |
@@ -391,6 +397,13 @@ page bank header. So `MEMO-OPEN BLKS` and `0 EDIT` reach the same
 screens; `EDIT` is the classic Forth spelling and goes straight to a
 block, and `MEMO-OPEN` also opens a block bank kept under another
 name.
+
+**The current page document.** Opening a page bank makes it the
+*current page document*, which `MEMO` always enters on: MEMO's own
+full-screen world. A block bank is a detour. Opening one, with `EDIT`
+or with `MEMO-OPEN`, shows it until MEMO is next entered with `MEMO`,
+which returns to the current page document, at its own page and cursor.
+Opening a block bank never changes the current page document.
 
 Opening a name that has no bank creates a `MEMO`-tagged page bank of
 16 KiB with one blank page in the current screen geometry. Opening
@@ -437,8 +450,8 @@ the project, or on its own with `BANK-SAVE name`, like any other
   MEMO trusts.
 - **Colors.** A page has no color information. MEMO shows it in the
   current `INK` and `PAPER`.
-- **Leaving.** Any switching word, executed as in §6. The page is
-  committed first by §6.3.
+- **Leaving.** Shift-Esc on a blank line (§6), or any switching word
+  executed as in §6. The page is committed first either way.
 
 ## 9. Editing on behalf of another environment
 
@@ -501,4 +514,6 @@ environments are simply peers.
 | Line join and page join do nothing when nothing could be kept | §4.4, §5.3 |
 | The page is committed before any page turn, any executed line, and any environment switch | §2.1, §6.3 |
 | An executed line's output is captured and written below the command, never above it and never past the bottom of the page; its status is written on its own line as a `\` comment | §6.1–§6.3 |
+| Shift-Esc on a blank line commits the page and switches to `HOME` | §6 |
+| `MEMO` always enters on the current page document; a block bank is shown only when opened by `EDIT` or `MEMO-OPEN` | §7.1 |
 | A document whose page does not fit the screen is refused | §2.1, §3.3 |
