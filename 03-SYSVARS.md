@@ -1,6 +1,6 @@
 # 03 — Sysvars Specification
 
-**Version 1.0.** See `00-OVERVIEW.md` for normative-language definitions
+**Version 1.1.** See `00-OVERVIEW.md` for normative-language definitions
 and suite scope. Builds directly on `02-MEMORY-MODEL.md`'s `SYSV` bank
 (tag `SYSV`, minimum size class — 4 KiB, §4.3 there) — this document is
 purely about what lives *inside* that bank: its header, its grouped

@@ -1,6 +1,6 @@
 # 02 — Memory Model Specification
 
-**Version 1.0.** See `00-OVERVIEW.md` for normative-language definitions,
+**Version 1.1.** See `00-OVERVIEW.md` for normative-language definitions,
 suite scope, and the portable-logic/per-target-boundary distinction
 `01-HAL.md` already relies on — this document has no HAL-boundary
 content of its own (nothing here is per-target; the whole point of a

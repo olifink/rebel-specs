@@ -1,6 +1,6 @@
 # 01 — Hardware Abstraction Layer (HAL) Specification
 
-**Version 1.0.** See `00-OVERVIEW.md` for normative-language definitions,
+**Version 1.1.** See `00-OVERVIEW.md` for normative-language definitions,
 suite scope, and the portable-logic/per-target-boundary distinction this
 document relies on throughout.
 

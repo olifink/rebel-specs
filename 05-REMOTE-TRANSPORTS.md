@@ -1,4 +1,6 @@
-# 05-REMOTE-TRANSPORTS.md — a transport contract for `REMOTE-TERMINAL.md`'s wire protocol
+# 05 — Remote Transports: a transport contract for `REMOTE-TERMINAL.md`'s wire protocol
+
+**Version 1.1, draft, design-only.** Rebel-Sim-specific; see §0.
 
 ## 0. What this document is (and isn't)
 

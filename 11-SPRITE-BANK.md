@@ -1,4 +1,6 @@
-# SPRITE-BANK.md
+# 11 — Sprite Bank Format
+
+**Version 1.1, draft.** See `00-OVERVIEW.md` for suite scope.
 
 ## Purpose
 

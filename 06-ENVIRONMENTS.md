@@ -1,6 +1,6 @@
 # 06 — Environments Specification
 
-**Draft.** See `00-OVERVIEW.md` for normative-language definitions and
+**Version 1.1, draft.** See `00-OVERVIEW.md` for normative-language definitions and
 suite scope. Nothing here is implemented on any reference target yet.
 The rest of the suite already carries what this document needs from
 it; §11 says where.

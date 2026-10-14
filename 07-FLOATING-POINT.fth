@@ -1,5 +1,5 @@
-\ 07-FLOATING-POINT.fth -- reference source for the float wordset's
-\ Forth-source layer (07-FLOATING-POINT.md section 5.1 and 5.2).
+\ 07-FLOATING-POINT.fth -- version 1.1, draft. Reference source for the
+\ float wordset's Forth-source layer (07-FLOATING-POINT.md sections 5, 6).
 \ Normative: a target's results must be bit-identical to these.
 \ Needs the eight KERNEL float words (section 4) and the core words.
 \ Every constant is the exact binary32 bit pattern, in hex. A pattern

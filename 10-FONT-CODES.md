@@ -1,4 +1,6 @@
-# FONT-CODES.md
+# 10 — Font Codes
+
+**Version 1.1.** See `00-OVERVIEW.md` for suite scope.
 
 Code point assignments for Rebel's font bank. One entry per byte value,
 8 bytes/char (row 0 = top, MSB = leftmost pixel). This doc tracks *what's

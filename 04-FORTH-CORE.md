@@ -1,6 +1,6 @@
 # 04 — Forth Core Specification
 
-**Version 1.0.** See `00-OVERVIEW.md` for normative-language definitions
+**Version 1.1.** See `00-OVERVIEW.md` for normative-language definitions
 and suite scope. Builds on `02-MEMORY-MODEL.md` (cells, arenas, banks —
 in particular `DICT`/`RSTK`/`DSTK`) and `03-SYSVARS.md` (the `FORTH`
 group: `SP0`/`RP0`/`HERE`/`LATEST`/`BASE`/`STATE`/`SP`/`RP`). Cross-checked

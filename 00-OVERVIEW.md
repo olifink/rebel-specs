@@ -1,14 +1,20 @@
-# Rebel Forth System — Technical Specification Suite
+# 00 — Overview: Rebel Machine Specification Suite
+
+**Version 1.1.** Every document in the suite is at version 1.1, its
+current state. A document still marked *draft* is specified but not
+yet implemented on any reference target.
 
 ## 1. What this is
 
 This directory is a portable, implementation-independent technical
-specification for the **Rebel Forth system**: a token-threaded Forth
-engine plus the memory model, sysvar contract, and hardware abstraction
-boundary it depends on. It is written to be implementable **from this
-suite alone**, by an engineer or coding agent with no access to any
-existing Rebel-family codebase (browser simulator or bare-metal
-firmware).
+specification for the **Rebel machine**: a token-threaded Forth engine
+plus the memory model, sysvar contract, and hardware abstraction
+boundary it depends on, and the system built on top of it — a way for
+other interactive programs to take over the machine, a floating-point
+wordset, Rebel BASIC, the MEMO editor, and the data formats they share.
+It is written to be implementable **from this suite alone**, by an
+engineer or coding agent with no access to any existing Rebel-family
+codebase (browser simulator or bare-metal firmware).
 
 Two concrete reference implementations already exist and independently
 validate the decisions recorded here — a browser-based TypeScript
@@ -39,24 +45,49 @@ target's own porting notes, not here.
 
 ## 3. Document index
 
+The suite has four parts. Read the core first; everything else is
+built on it and leaves it unchanged except where a document says so.
+
+### 3.1 The core
+
+What every conformant target implements.
+
 | # | Document | Status | Covers |
 |---|---|---|---|
-| 01 | [`01-HAL.md`](01-HAL.md) | **v1.0** | The hardware abstraction boundary: screen, keyboard/input, the input-channel abstraction, storage, timing, error reporting. What every target must supply, and what's portable and must never be reimplemented per target. |
-| 02 | [`02-MEMORY-MODEL.md`](02-MEMORY-MODEL.md) | **v1.0** | The cell, the flat per-arena address space, the bank system and its size classes/alignment rule, the arena-resident bank table (`MMAP`), multi-arena isolation. |
-| 03 | [`03-SYSVARS.md`](03-SYSVARS.md) | **v1.0** | The `SYSV` bank's header, its grouped layout, per-field byte offsets, naming convention, and the field-presence-signals-capability convention `01-HAL.md` already assumes exists. |
-| 04 | [`04-FORTH-CORE.md`](04-FORTH-CORE.md) | **v1.0** | Dictionary header, token-threaded dispatch, the outer interpreter, the full primitive catalog (KERNEL vs. BOOTSTRAP), the bootstrap Forth-source layer, the error/exception model. |
-| 05 | [`05-REMOTE-TRANSPORTS.md`](05-REMOTE-TRANSPORTS.md) | **Draft, design-only** | Not part of the portable suite below — Rebel-Sim-implementation-specific. A transport contract (`Transport` interface) for `REMOTE-TERMINAL.md`'s wire protocol, plus a survey of concrete transports (WebSerial, WebSocket bridge, Web Bluetooth) beyond the one that document already specs. |
-| 06 | [`06-ENVIRONMENTS.md`](06-ENVIRONMENTS.md) | **Draft** | How interactive programs other than the Forth prompt (BASIC, the MEMO editor) take over screen and keyboard as peers of it: the environment record, the driving loop's one added branch, the switch procedure, per-environment saved screens, and error recovery inside an environment. Unimplemented on any reference target; `01`-`04` already carry the sysvar group, driving-loop branch, bank tag, and asset extension it needs. |
-| 07 | [`07-FLOATING-POINT.md`](07-FLOATING-POINT.md) | **Draft** | An optional floating-point wordset: IEEE 754 binary32 in one cell on the data stack, the rules that keep results bit-identical across targets, eight native words, and a portable Forth-source layer for everything else. Required by Rebel BASIC, not by the Forth core. |
-| 08 | [`08-BASIC.md`](08-BASIC.md) | **Draft** | Rebel BASIC: a Sinclair-flavoured BASIC that runs as an environment, compiling program text to Forth threaded code at `RUN`. Static types by name suffix (32-bit float, integer, string), optional line numbers and named labels, stop/continue debugging, and calls into Forth. Loadable, not part of the core. |
-| 09 | [`09-MEMO.md`](09-MEMO.md) | **Draft** | MEMO: a full-screen, line-centric, overwrite-mode editor that runs as an environment. Documents are stacks of screen-sized pages; edits never reflow and are lossy at the margins; any line can be executed as Forth. Edits its own documents, Rebel BASIC programs, and 64 × 16 Forth screens in a `BLKS` bank. Defines the page bank format Rebel BASIC programs share. Loadable, not part of the core. |
+| 01 | [`01-HAL.md`](01-HAL.md) | **v1.1** | The hardware abstraction boundary: screen (text, pixels, sprite blit), keyboard and the input-channel abstraction, storage and project files, memory block operations, timing, error reporting. What every target must supply, and what is portable and must never be reimplemented per target. |
+| 02 | [`02-MEMORY-MODEL.md`](02-MEMORY-MODEL.md) | **v1.1** | The cell, the flat per-arena address space, banks and their size classes, the arena-resident bank table (`MMAP`), resizing and removing banks, multi-arena isolation. |
+| 03 | [`03-SYSVARS.md`](03-SYSVARS.md) | **v1.1** | The `SYSV` bank's header, its grouped layout and per-field byte offsets, the naming convention, and the field-presence-signals-capability rule. |
+| 04 | [`04-FORTH-CORE.md`](04-FORTH-CORE.md) | **v1.1** | Dictionary header, token-threaded dispatch, the outer interpreter and driving loop, the primitive catalog (KERNEL vs. BOOTSTRAP) including the bank, raw-key and `EVALUATE` words, the bootstrap Forth-source layer, the error model. |
 
-Documents `01`-`04` are written and form the portable suite proper. This
-index is kept here so cross-references between them resolve to a real
-target, and so each document's own scope boundaries — what it
-deliberately does *not* cover because it belongs to one of the others —
-are legible. `05` is listed for discoverability but is a different kind
-of document (see its own §0) — Rebel-Sim-specific, not target-generic.
+### 3.2 The system layer
+
+Built on the core. All draft: specified, not yet implemented on any
+reference target.
+
+| # | Document | Status | Covers |
+|---|---|---|---|
+| 06 | [`06-ENVIRONMENTS.md`](06-ENVIRONMENTS.md) | **v1.1**, draft | How interactive programs other than the Forth prompt take over screen and keyboard as its peers: the environment record, the driving loop's one added branch, switching, per-environment saved screens, error recovery. **Required** on any target with a self-hosted outer interpreter. |
+| 07 | [`07-FLOATING-POINT.md`](07-FLOATING-POINT.md) | **v1.1**, draft | An optional floating-point wordset: IEEE 754 binary32 in one cell on the data stack, the rules that keep results bit-identical across targets, eight native words, and everything else in portable Forth. |
+| 07 | [`07-FLOATING-POINT.fth`](07-FLOATING-POINT.fth) | **v1.1**, draft | The normative reference source for `07-FLOATING-POINT.md`'s Forth layer: derived words, elementary functions, text conversion. |
+| 08 | [`08-BASIC.md`](08-BASIC.md) | **v1.1**, draft | Rebel BASIC: a Sinclair-flavoured BASIC that runs as an environment and compiles program text to Forth threaded code at `RUN`. Typed by name suffix, optional line numbers and labels, stop/continue debugging, calls into Forth. Loadable; needs `06` and `07`. |
+| 09 | [`09-MEMO.md`](09-MEMO.md) | **v1.1**, draft | MEMO: a full-screen, line-centric, overwrite-mode page editor that runs as an environment, where any line can be executed as Forth. Edits its own documents, BASIC programs, and 64 × 16 Forth screens. Defines the page bank format. Loadable; needs `06`. |
+
+### 3.3 Data formats
+
+Payload formats for particular bank tags, defined independently of any
+one program that uses them.
+
+| # | Document | Status | Covers |
+|---|---|---|---|
+| 10 | [`10-FONT-CODES.md`](10-FONT-CODES.md) | **v1.1** | Which glyph sits at each of the 256 character codes: ASCII, and JIS X 0201 kana in the upper half. |
+| 11 | [`11-SPRITE-BANK.md`](11-SPRITE-BANK.md) | **v1.1**, draft | The `SPRT` bank: a 16-color palette and 4-bit-per-pixel entries, blitted freely as sprites or on the character grid as tiles (`01-HAL.md` §3.8). |
+| 12 | [`12-WORLD-MAP.md`](12-WORLD-MAP.md) | **v1.1**, draft | Rooms and the world graph for flip-screen games — isometric, top-down, and platform — stored in `DATA` banks. |
+
+### 3.4 Implementation-specific
+
+| # | Document | Status | Covers |
+|---|---|---|---|
+| 05 | [`05-REMOTE-TRANSPORTS.md`](05-REMOTE-TRANSPORTS.md) | **v1.1**, draft, design-only | Specific to Rebel-Sim, not target-generic, and without RFC 2119 language (see its own §0). A transport contract for the remote-terminal wire protocol, which Rebel-Sim's `REMOTE-TERMINAL.md` defines, and a survey of possible transports. |
 
 ## 4. Normative language
 
@@ -102,8 +133,8 @@ readability, not because the rule is local to it:
 - **Minimum real mechanism, not ahead of need.** This suite documents
   what a conformant implementation must actually provide today. Where a
   plausible future need is visible but not yet load-bearing anywhere
-  (e.g. multi-arena management, per-channel-type configuration, generic
-  bank introspection), it is named as an explicit open extension point,
+  (e.g. multi-arena management, per-channel-type configuration, bank
+  compaction), it is named as an explicit open extension point,
   not designed prematurely and not silently ignored.
 
 ## 6. How to read a spec in this suite

@@ -1,4 +1,6 @@
-# WORLD-MAP.md
+# 12 — World Map Format
+
+**Version 1.1, draft.** See `00-OVERVIEW.md` for suite scope.
 
 ## Purpose
 
@@ -15,7 +17,7 @@ Exits are room-to-room jumps, not scroll boundaries.
 
 ## Relationship to 02-MEMORY-MODEL.md / 01-HAL.md
 
-Unlike `SPRITE-BANK.md`, no bank tag exists yet for this data —
+Unlike `11-SPRITE-BANK.md`, no bank tag exists yet for this data —
 `02-MEMORY-MODEL.md` §4.6's known-tag list has nothing world/room-shaped,
 and it's explicit that list "grows... as a target's own real, load-bearing
 need" adds to it, not on spec. Given that, this format is scoped to live
@@ -24,7 +26,7 @@ extension and "ordinary content asset" persistence, `01-HAL.md` §6.3)
 rather than proposing a new tag — the format itself is opaque bytes to
 the memory model either way, and `02-MEMORY-MODEL.md` §4.7 already lets
 multiple `DATA`-tagged banks coexist, distinguished by `name` (one world
-per bank, named for the world/level), the same way `SPRITE-BANK.md`
+per bank, named for the world/level), the same way `11-SPRITE-BANK.md`
 distinguishes multiple sprite sheets under `SPRT`. Every "Offset" below
 is relative to the bank's own base (byte 6 of a persisted `.DAT` file,
 past the standard asset header, `01-HAL.md` §6.3). A world exceeding one
@@ -70,12 +72,12 @@ single byte per cell — not worth branching the format over.
 
 ```
 Offset  Size   Contents
-0       1      tile bank entry index (references SPRITE-BANK.md)
+0       1      tile bank entry index (references 11-SPRITE-BANK.md)
 1       1      solidity flags
 ```
 
 **Open gap, not resolved here:** nothing in this format says *which*
-`SPRT`-tagged bank (`SPRITE-BANK.md`) a room's tile indices resolve
+`SPRT`-tagged bank (`11-SPRITE-BANK.md`) a room's tile indices resolve
 against, and `02-MEMORY-MODEL.md` §4.7 allows several to be resident at
 once, distinguished by name. `03-SYSVARS.md` §9's `SPRITE` group is
 fully reserved with no fields defined yet — the natural home for an
@@ -202,7 +204,7 @@ position**:
   to this format is needed to support this — it's purely a difference
   in what the entity's position state means, layered above the grid.
 
-`WORLD-MAP.md` does not need to declare which mode a given game uses;
+This format does not need to declare which mode a given game uses;
 that's a property of the entity/movement code, not the room data.
 
 ## Depth sorting (isometric)
@@ -211,7 +213,7 @@ Render order for a room's cells, when using the isometric renderer, is
 determined by `x + y + z` (painter's algorithm) computed at draw time
 from the same authoritative cell grid. No separate sort-order data is
 stored — this is render-time logic, consistent with keeping projection
-and screen placement out of stored data (see `SPRITE-BANK.md`).
+and screen placement out of stored data (see `11-SPRITE-BANK.md`).
 
 ## Explicitly deferred
 
