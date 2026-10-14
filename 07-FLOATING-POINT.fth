@@ -160,3 +160,121 @@ VARIABLE AINV  VARIABLE AOFF
     SWAP FABS FLN F* FEXP  R> IF FNEGATE THEN EXIT
   THEN
   SWAP FLN F* FEXP ;
+
+\ ---- 5.3 conversion to and from text ----
+
+CREATE P10  HEX                       \ 10^0 .. 10^10, all exact
+  3F800000 , 41200000 , 42C80000 , 447A0000 , 461C4000 , 47C35000 ,
+  49742400 , 4B189680 , 4CBEBC20 , 4E6E6B28 , 501502F9 ,
+DECIMAL
+: 10^  ( n -- r )  CELLS P10 + @ ;    \ 0 <= n <= 10
+
+\ r times 10^k, using exact powers of ten at most 10^10 at a time.
+: FSCALE10  ( r k -- r' )
+  BEGIN DUP 10 > WHILE   SWAP 10 10^ F* SWAP 10 -  REPEAT
+  BEGIN DUP -10 < WHILE  SWAP 10 10^ F/ SWAP 10 +  REPEAT
+  DUP 0< IF NEGATE 10^ F/ ELSE 10^ F* THEN ;
+
+\ >FLOAT: up to 9 significant digits are accumulated as an integer,
+\ which is converted and then scaled by the decimal exponent.
+VARIABLE FP  VARIABLE FL                      \ text cursor
+VARIABLE FM  VARIABLE FD  VARIABLE FNDIG  VARIABLE FX
+: PEEK   ( -- c )  FL @ IF FP @ C@ ELSE 0 THEN ;   \ 0 at the end
+: SKIP1  ( -- )    1 FP +!  -1 FL +! ;
+: DIGIT?  ( c -- n TRUE | FALSE )
+  48 -  DUP 0 10 WITHIN IF -1 ELSE DROP 0 THEN ;
+: SIGN?  ( -- neg? )        \ consumes an optional + or -
+  PEEK 45 = IF SKIP1 -1 EXIT THEN  PEEK 43 = IF SKIP1 THEN 0 ;
+: MDIGITS  ( frac? -- )     \ mantissa digits; frac? after the point
+  BEGIN PEEK DIGIT? WHILE
+    SKIP1  1 FNDIG +!
+    FM @ 100000000 < IF  FM @ 10 * + FM !  DUP IF -1 FD +! THEN
+    ELSE  DROP  DUP 0= IF 1 FD +! THEN  THEN
+  REPEAT DROP ;
+: >FLOAT  ( addr len -- r TRUE | FALSE )
+  FL ! FP !  0 FM !  0 FD !  0 FNDIG !
+  SIGN? >R
+  0 MDIGITS
+  PEEK 46 = IF SKIP1 -1 MDIGITS THEN
+  FNDIG @ 0= IF R> DROP 0 EXIT THEN
+  PEEK 32 OR 101 = IF                         \ E or e
+    SKIP1  SIGN?  0 FX !  0
+    BEGIN PEEK DIGIT? WHILE
+      SKIP1  FX @ DUP 1000 < IF 10 * + ELSE NIP THEN FX !  1+
+    REPEAT
+    0= IF DROP R> DROP 0 EXIT THEN
+    IF FX @ NEGATE ELSE FX @ THEN  FD +!
+  THEN
+  FL @ IF R> DROP 0 EXIT THEN                 \ anything left over
+  FM @ S>F  FD @ FSCALE10
+  R> IF FNEGATE THEN  -1 ;
+
+\ (F.): seven significant digits, rounded; plain notation from 1E-5
+\ up to 1E+7, exponent notation outside it.
+CREATE FBUF 24 ALLOT  VARIABLE FBL   \ (F.)'s result, until the next call
+CREATE FDIG 8 ALLOT   VARIABLE FE
+: +C  ( c -- )  FBUF FBL @ + C!  1 FBL +! ;
+: DIG  ( i -- )  FDIG + C@ +C ;
+: DIGS  ( from to -- )  BEGIN 2DUP > 0= WHILE OVER DIG SWAP 1+ SWAP REPEAT 2DROP ;
+: LASTNZ  ( -- i )  6 BEGIN DUP FDIG + C@ 48 = WHILE 1- REPEAT ;
+: >DIGITS  ( n -- )  7 0 DO  10 /MOD SWAP 48 + FDIG 6 I - + C!  LOOP DROP ;
+: FESTIMATE  ( a -- e )  8388608 / 127 -  77 * 256 / ;  \ about log10 a
+\ Nearest integer to m >= 0, m below 2^24 (where F>S and S>F are exact).
+: FROUND  ( m -- n )  DUP F>S  TUCK S>F F-  F0.5 F< 0= IF 1+ THEN ;
+
+\ The exact product a*b as p + err (Dekker): p = a*b rounded, err exact.
+HEX 45801000 CONSTANT F4097  BF000000 CONSTANT F-0.5  DECIMAL
+: FSPLIT  ( a -- hi lo )  DUP F4097 F*  DUP 2 PICK F- F-  TUCK F- ;
+VARIABLE TPP  VARIABLE TAH  VARIABLE TAL  VARIABLE TBH  VARIABLE TBL
+: TWOPROD  ( a b -- p err )
+  2DUP F* TPP !  FSPLIT TBL ! TBH !  FSPLIT TAL ! TAH !
+  TAH @ TBH @ F* TPP @ F-  TAH @ TBL @ F* F+
+  TAL @ TBH @ F* F+  TAL @ TBL @ F* F+  TPP @ SWAP ;
+
+\ Nearest integer to p + err, p >= 0 below 2^24, |err| small.
+: FROUND2  ( p err -- n )
+  >R DUP F>S  TUCK S>F F-  R> F+
+  DUP F0.5 F< 0= IF DROP 1+ ELSE F-0.5 F< IF 1- THEN THEN ;
+
+\ Nearest integer to a * 10^k. Exact when one multiplication or
+\ division by an exact power of ten does it (-10 <= k <= 10).
+VARIABLE TA  VARIABLE TD  VARIABLE TQ
+: FSCALED  ( a k -- n )
+  DUP 0 11 WITHIN IF  10^ TWOPROD FROUND2  EXIT THEN
+  DUP -10 0 WITHIN IF
+    NEGATE 10^ TD !  TA !  TA @ TD @ F/ TQ !          \ q = a / D
+    TQ @ TD @ TWOPROD  >R TA @ SWAP F-  R> F-  TD @ F/  \ (a - q*D) / D
+    TQ @ SWAP FROUND2  EXIT
+  THEN
+  FSCALE10 FROUND ;
+: F>DIG7  ( a -- n )         \ a > 0; n in 1000000..9999999, sets FE
+  DUP FESTIMATE FE !
+  BEGIN
+    DUP 6 FE @ - FSCALED
+    DUP 10000000 < 0= IF  DROP 1 FE +! 0  ELSE
+    DUP 1000000 < IF  DROP -1 FE +! 0  ELSE -1 THEN THEN
+  UNTIL NIP ;
+: (F.)  ( r -- addr len )
+  0 FBL !
+  DUP FNAN? IF DROP 78 +C 65 +C 78 +C  FBUF FBL @ EXIT THEN
+  DUP F0< IF 45 +C THEN  FABS
+  DUP F+INF = IF DROP 73 +C 78 +C 70 +C  FBUF FBL @ EXIT THEN
+  DUP F0= IF DROP 48 +C  FBUF FBL @ EXIT THEN
+  F>DIG7 >DIGITS  FE @
+  DUP -5 < OVER 6 > OR IF                        \ d.ddddddE+nn
+    0 DIG  LASTNZ DUP 0> IF 46 +C 1 SWAP DIGS ELSE DROP THEN
+    69 +C  DUP 0< IF 45 +C NEGATE ELSE 43 +C THEN
+    DUP 10 / 48 + +C  10 MOD 48 + +C
+  ELSE DUP 0< IF                                 \ 0.000ddd
+    48 +C 46 +C  NEGATE 1- BEGIN DUP WHILE 48 +C 1- REPEAT DROP
+    0 LASTNZ DIGS
+  ELSE                                           \ ddd.ddd
+    0 OVER DIGS  LASTNZ 2DUP < IF 46 +C SWAP 1+ SWAP DIGS ELSE 2DROP THEN
+  THEN THEN
+  FBUF FBL @ ;
+: F.  ( r -- )  (F.) TYPE SPACE ;
+
+\ F# (section 6): a float literal, pushed or compiled.
+: F#  ( "number" -- r )
+  BL WORD >FLOAT 0= IF ABORT THEN
+  STATE @ IF LIT-XT , , THEN ; IMMEDIATE

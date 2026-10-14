@@ -126,7 +126,7 @@ Portable Forth source over §4, loaded with the wordset. As in
 natively, provided the result is bit-identical to the reference
 definition.
 
-The reference source for §5.1 and §5.2 is
+The reference source for §5 and §6 is
 [`07-FLOATING-POINT.fth`](07-FLOATING-POINT.fth). It is normative: a
 target's results **MUST** be bit-identical to it.
 
@@ -222,7 +222,7 @@ Rebel target.
 | Word | Effect |
 |---|---|
 | `>FLOAT` | `( addr len -- r TRUE \| FALSE )` — parses decimal text: optional sign, digits with an optional decimal point, optional `E` exponent with optional sign. Always decimal, regardless of `BASE`. Leaves only `FALSE` if the text is not a number in that form. |
-| `(F.)` | `( r -- addr len )` — formats `r` as decimal text in the scratch area (`PAD`). |
+| `(F.)` | `( r -- addr len )` — formats `r` as decimal text, in a buffer of its own that the next call overwrites. |
 | `F.` | `( r -- )` — `(F.) TYPE SPACE`. |
 
 Like §5.2, these are defined by shared Forth source, for the same
@@ -232,8 +232,55 @@ and in format.
 `(F.)` produces the format `08-BASIC.md` §8.3 specifies for a float: at
 most 7 significant digits, trailing zeros removed, exponent form at
 `1E+7` and above or below `1E-5`. An infinity prints as `INF` or
-`-INF`, NaN as `NAN`. The precision `>FLOAT` guarantees is still open
-(§8).
+`-INF`, NaN as `NAN`, and zero, of either sign, as `0`.
+
+**How `(F.)` works.** It finds the decimal exponent *e*, scales the
+value by 10^(6 − *e*) to an integer of exactly seven digits, rounds it,
+and lays the digits out. While a single multiplication or division by
+an exact power of ten does the scaling — values from about `1E-4` to
+`1E+17` — the product is formed exactly (Dekker's method, with no
+fused multiply-add) and the seven digits are the correctly rounded
+decimal value of the float. Outside that range the scaling takes
+several rounded steps and the seventh digit can be one off.
+
+**How `>FLOAT` works.** It reads up to nine significant digits as an
+integer, ignoring any further digits but counting their place, converts
+that integer with `S>F`, and scales it by the decimal exponent through
+exact powers of ten. The result is **correctly rounded whenever the
+digits form an integer no greater than 2²⁴ and the decimal exponent is
+between −10 and 10** — one exact conversion and one rounded operation.
+That covers the numbers people type: `0.1`, `3.5`, `12`, `-0.25`,
+`1E10`. Otherwise it is within 2 ulp. Text is accepted only if it is
+entirely the number: no leading or trailing spaces, and `E` may be
+either case. One known edge: `3.4028235E38`, the largest float, reads
+as infinity, because its scaling rounds up three times.
+
+**Test vectors.**
+
+| `(F.)` input | Text |
+|---|---|
+| `3DCCCCCD` | `0.1` |
+| `3EAAAAAB` | `0.3333333` |
+| `3FB504F3` | `1.414214` |
+| `40490FDB` | `3.141593` |
+| `501502F9` | `1E+10` |
+| `36D1B717` | `6.25E-06` |
+| `C1480000` | `-12.5` |
+| `0DA24260` | `1E-30` |
+
+| `>FLOAT` text | Result |
+|---|---|
+| `0.1` | `3DCCCCCD` |
+| `3.14159` | `40490FD0` |
+| `1E-30` | `0DA24260` |
+| `-2.5E7` | `CBBEBC20` |
+
+Checked the same way as §5.2: on 80,000 values from `1E-4` to `1E+17`,
+`(F.)` matched correctly rounded seven-digit output every time; over
+the whole float range about one value in fifteen differed in the
+seventh digit, all of them outside that span. Of 40,000 `>FLOAT`
+inputs of three to nine digits, three quarters were correctly rounded
+and none was more than 2 ulp off.
 
 ## 6. Float literals
 
@@ -281,12 +328,9 @@ calls `>FLOAT` directly.
   for large arguments, and minimax coefficients would buy back a bit or
   two; either changes results, so it is a new version of the reference
   source, not a target option.
-- **The text conversion source** (§5.3): `>FLOAT` and `(F.)` have a
-  contract and no reference definition yet.
-- **`>FLOAT` precision** (§5.3). Whether parsing is correctly rounded
-  for all inputs or only up to some digit count. Seven-digit printing
-  does not round-trip every float, so a value printed and read back
-  may differ in its last bits whatever is decided here.
+- **Round trips.** Seven-digit printing does not identify every
+  float, so a value printed and read back may differ in its last bits.
+  A shortest-round-trip printer would fix this at real cost in code.
 - **Float literals in the outer interpreter.** If `F#` proves too
   awkward in practice, `NUMBER` could fall back to `>FLOAT` for tokens
   containing a decimal point while `BASE` is ten. Deliberately not done

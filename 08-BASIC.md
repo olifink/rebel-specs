@@ -645,11 +645,10 @@ corresponding Forth words are specified, programs use `CALL`.
 
 ## 14. What this needs that the suite does not yet specify
 
-One thing remains: the reference source for float text conversion,
-`>FLOAT` and `(F.)`, which `VAL`, `INPUT`, `PRINT` and `STR$` are built
-on (`07-FLOATING-POINT.md` §5.3, §8). The elementary functions behind
-`SIN`, `LN`, `^` and the rest are specified (`07-FLOATING-POINT.md`
-§5.2).
+Nothing remains. The float words BASIC is built on — arithmetic, the
+elementary functions behind `SIN`, `LN` and `^`, and the text
+conversion behind `PRINT`, `STR$`, `VAL` and `INPUT` — all have
+reference source (`07-FLOATING-POINT.md` §5).
 
 Everything else BASIC uses is specified: bank lookup, creation, and
 single-bank save and load by name (`04-FORTH-CORE.md` §6.14); the
