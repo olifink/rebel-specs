@@ -126,12 +126,16 @@ Portable Forth source over §4, loaded with the wordset. As in
 natively, provided the result is bit-identical to the reference
 definition.
 
+The reference source for §5.1 and §5.2 is
+[`07-FLOATING-POINT.fth`](07-FLOATING-POINT.fth). It is normative: a
+target's results **MUST** be bit-identical to it.
+
 ### 5.1 Derived arithmetic and tests
 
 | Word | Effect | Definition |
 |---|---|---|
-| `FNEGATE` | `( r -- -r )` | Flip bit 31. `: FNEGATE SIGN-BIT XOR ;` with `SIGN-BIT` the cell `0x80000000`. Applies to NaN and zero alike. |
-| `FABS` | `( r -- \|r\| )` | Clear bit 31. |
+| `FNEGATE` | `( r -- -r )` | Flip bit 31, with `SIGN-BIT` the cell `0x80000000`. Applies to zero alike; a NaN argument gives the canonical NaN (§3 rule 6). |
+| `FABS` | `( r -- \|r\| )` | Clear bit 31; a NaN argument gives the canonical NaN. |
 | `F-` | `( r1 r2 -- r1-r2 )` | `: F- FNEGATE F+ ;` — identical to IEEE subtraction for every non-NaN input, and NaN is canonical either way (§3). |
 | `F0=` | `( r -- flag )` | `: F0= FABS 0= ;` |
 | `F0<` | `( r -- flag )` | `: F0< 0 F< ;` — integer `0` is the bit pattern of `+0.0`. |
@@ -139,8 +143,8 @@ definition.
 | `FMIN` `FMAX` | `( r1 r2 -- r )` | Built on `F<`. If either argument is NaN the result is NaN. |
 | `FNAN?` | `( r -- flag )` | `: FNAN? DUP F= 0= ;` |
 | `FINITE?` | `( r -- flag )` | `TRUE` unless `r` is an infinity or NaN — exponent field not all ones. The test a caller uses to turn §3 rule 5's silent results into its own errors. |
-| `FLOOR` | `( r -- r' )` | Largest integral float not above `r`. Values of magnitude 2²⁴ or more, infinities, and NaN are returned unchanged; the rest go through `F>S`/`S>F` with a one-step downward adjustment for negative non-integers. |
-| `FTRUNC` | `( r -- r' )` | As `FLOOR`, rounding toward zero. |
+| `FLOOR` | `( r -- r' )` | Largest integral float not above `r`: `FTRUNC`, less one where that rounded a negative value up. |
+| `FTRUNC` | `( r -- r' )` | Rounds toward zero, through `F>S`/`S>F`. Values of magnitude 2²⁴ or more and infinities, which are already integral, are returned unchanged; NaN gives the canonical NaN. A negative value that truncates to zero gives `+0.0`. |
 
 ### 5.2 Elementary functions
 
@@ -151,6 +155,7 @@ definition.
 | `FEXP` | `( r -- e^r )` |
 | `FLN` | `( r -- ln r )`; NaN for a negative argument, negative infinity for zero |
 | `F**` | `( r1 r2 -- r1^r2 )` |
+| `F**N` | `( r n -- r^n )`, `n` an integer |
 
 **These MUST NOT be implemented by calling the host's math library.**
 Unlike §4's operations, IEEE 754 does not require elementary functions
@@ -164,7 +169,53 @@ A native version is permitted only if it reproduces the reference
 algorithm operation for operation in binary32 under §3's rules — in
 practice, a transliteration.
 
-The reference source does not exist yet (§8).
+**The algorithms are deliberately plain**: textbook range reduction and
+short Taylor series, each a few lines of Forth, chosen for being easy
+to read and port rather than for the last bit of accuracy.
+
+| Word | Method | Accuracy |
+|---|---|---|
+| `FEXP` | `x = k·ln 2 + r`, `|r| ≤ ln 2 / 2`; Taylor series to `r⁷`; scaled by `2ᵏ` | about 1 ulp |
+| `FLN` | `x = 2ᵏ·m`, `√½ < m ≤ √2`; `ln m = 2 atanh s`, `s = (m−1)/(m+1)`, series to `s⁹`; plus `k·ln 2` | about 3 ulp |
+| `FSIN` `FCOS` | `|x| = n·π/2 + y`, `|y| ≤ π/4`; Taylor series for `sin y` to `y⁹` or `cos y` to `y¹⁰`, by `n mod 4` | below 1E−7 absolute for `|x|` < 1000, about 1E−6 at `|x|` = 1E5; meaningless beyond about 1E7. Infinity gives NaN. |
+| `FTAN` | `FSIN` / `FCOS` | about 3 ulp away from the poles |
+| `FATAN` | `|x| > 1` via `π/2 − atan(1/|x|)`; `|x| > tan(π/8)` via `π/4 + atan((x−1)/(x+1))`; Taylor series to `x¹⁵` | about 3 ulp |
+| `F**N` | Repeated squaring; a negative `n` takes the reciprocal at the end | exact while every intermediate product is exactly representable; otherwise the error grows with `n` |
+| `F**` | `y = 0` gives 1; an integral `|y|` ≤ 32 uses `F**N`; otherwise `exp(y · ln x)`, with a negative `x` allowed only for an integral `y`, which gives the sign | as `FEXP` and `FLN`, scaled by `|y · ln x|` |
+
+"ulp" is the spacing of floats at the result. Near a zero of `FSIN` or
+`FCOS` the error is better described in absolute terms, as the table
+does. `F**N` exists for callers whose exponent is already an integer —
+BASIC's `^` with an integer exponent uses it directly
+(`08-BASIC.md` §5) — so `2 ^ 10` is exactly `1024`.
+
+**Test vectors.** Each is an input and the result the reference source
+produces, as bit patterns. A transliteration that disagrees on any of
+them is not conformant.
+
+| Word | Input | Result |
+|---|---|---|
+| `FEXP` | `3F800000` (1.0) | `402DF854` |
+| `FEXP` | `BF800000` (−1.0) | `3EBC5AB2` |
+| `FEXP` | `41200000` (10.0) | `46AC14EE` |
+| `FLN` | `40000000` (2.0) | `3F317218` |
+| `FLN` | `41200000` (10.0) | `40135D8E` |
+| `FLN` | `3F000000` (0.5) | `BF317218` |
+| `FSIN` | `3F800000` (1.0) | `3F576AA4` |
+| `FSIN` | `40400000` (3.0) | `3E1081C4` |
+| `FSIN` | `42C80000` (100.0) | `BF01A12E` |
+| `FCOS` | `3F800000` (1.0) | `3F0A5140` |
+| `FCOS` | `40400000` (3.0) | `BF7D7026` |
+| `FTAN` | `3F800000` (1.0) | `3FC75923` |
+| `FATAN` | `3F800000` (1.0) | `3F490FDB` |
+| `FATAN` | `3F000000` (0.5) | `3EED6338` |
+| `FATAN` | `41200000` (10.0) | `3FBC4DEA` |
+| `F**` | `40000000 3FC00000` (2, 1.5) | `403504F3` |
+
+These and the source were checked against a bit-exact binary32 model
+of the same algorithms over some 170,000 inputs, including zeros,
+infinities, NaN, and subnormals; the source has not yet been run on a
+Rebel target.
 
 ### 5.3 Conversion to and from text
 
@@ -225,19 +276,17 @@ calls `>FLOAT` directly.
 
 ## 8. Open questions
 
-- **The elementary-function reference source** (§5.2) has to be
-  written, and choosing its algorithms is real work: range reduction
-  for `FSIN`/`FCOS`, and how much accuracy to buy with how many
-  operations. Until it exists, those seven words have a contract and no
-  definition.
+- **More accurate elementary functions.** §5.2's algorithms favour
+  simplicity. Better range reduction would keep `FSIN`/`FCOS` accurate
+  for large arguments, and minimax coefficients would buy back a bit or
+  two; either changes results, so it is a new version of the reference
+  source, not a target option.
+- **The text conversion source** (§5.3): `>FLOAT` and `(F.)` have a
+  contract and no reference definition yet.
 - **`>FLOAT` precision** (§5.3). Whether parsing is correctly rounded
   for all inputs or only up to some digit count. Seven-digit printing
   does not round-trip every float, so a value printed and read back
   may differ in its last bits whatever is decided here.
-- **`F**` with integer exponents.** BASIC handles the common case
-  itself, by repeated multiplication when the exponent is an integer
-  (`08-BASIC.md` §5). Whether `F**` should also special-case integral
-  float exponents is undecided.
 - **Float literals in the outer interpreter.** If `F#` proves too
   awkward in practice, `NUMBER` could fall back to `>FLOAT` for tokens
   containing a decimal point while `BASE` is ten. Deliberately not done

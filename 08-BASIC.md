@@ -240,9 +240,9 @@ where noted.
 - **`DIV` and `MOD`** convert both operands to integer (by floor) and
   give the integer quotient and remainder. A zero divisor reports
   `6 Number too big`.
-- **`^`** with an integer-typed or adaptive-literal exponent is computed
-  by repeated multiplication, so `2 ^ 3` is exactly `8`. Otherwise it
-  is `F**`.
+- **`^`** with an integer-typed or adaptive-literal exponent is `F**N`
+  (`07-FLOATING-POINT.md` §5.2), repeated squaring, so `2 ^ 3` is
+  exactly `8`. Otherwise it is `F**`.
 - **`AND` and `OR` select, Sinclair style, and evaluate both operands.**
   `a AND b` is `a` if `b` is non-zero, else `0`. `a OR b` is `a` if `a`
   is non-zero, else `b`. If the two operands differ in type the result
@@ -645,8 +645,11 @@ corresponding Forth words are specified, programs use `CALL`.
 
 ## 14. What this needs that the suite does not yet specify
 
-One thing remains: the elementary-function source that `SIN`, `LN`,
-`^` and the rest are defined by (`07-FLOATING-POINT.md` §8).
+One thing remains: the reference source for float text conversion,
+`>FLOAT` and `(F.)`, which `VAL`, `INPUT`, `PRINT` and `STR$` are built
+on (`07-FLOATING-POINT.md` §5.3, §8). The elementary functions behind
+`SIN`, `LN`, `^` and the rest are specified (`07-FLOATING-POINT.md`
+§5.2).
 
 Everything else BASIC uses is specified: bank lookup, creation, and
 single-bank save and load by name (`04-FORTH-CORE.md` §6.14); the
