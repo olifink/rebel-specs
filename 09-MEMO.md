@@ -194,7 +194,7 @@ spaces.
 |---|---|
 | Shift-Space | **Insert a space** at the cursor. The character under the cursor and everything to its right move one cell right; the line's last character is lost. The cursor does not move. *(On a blank line this key splits the page instead — §5.2.)* |
 | Delete | **Delete the character** under the cursor. Everything to its right moves one cell left and a space enters at the right margin. The cursor does not move. |
-| Shift-Delete | **Clear to the end of the line**: the character under the cursor and everything to its right become spaces. The cursor does not move. |
+| Shift-Delete, Alt-Backspace | **Clear to the end of the line**: the character under the cursor and everything to its right become spaces. The cursor does not move. Both chords do it, because on keyboards whose Delete is itself a remapped chord (ChromeOS's Search- or Alt-Backspace) Shift-Delete may never reach the machine. |
 | Shift-Backspace | Away from column 0: the same as Delete. At column 0: **join** this line to the one above (§4.4). |
 
 ### 4.4 Splitting and joining lines
