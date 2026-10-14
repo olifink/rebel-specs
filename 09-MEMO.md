@@ -324,8 +324,15 @@ copied in.
    the command is on. From here to step 6 the document bank is the
    truth and the screen is scratch.
 2. Clear the screen and put the cursor at the top left.
-3. Interpret the line with `EVALUATE` (`04-FORTH-CORE.md` §6.15). The
-   search order is MEMO's own vocabulary, then `FORTH`.
+3. Interpret the line with `EVALUATE` (`04-FORTH-CORE.md` §6.15), with
+   the search order as MEMO found it. MEMO's internal words live in a
+   vocabulary of its own (`06-ENVIRONMENTS.md` §9), but that vocabulary
+   is **not** put in front of the search order. Vocabularies branch
+   (`04-FORTH-CORE.md` §7.2), so one created when MEMO was loaded cannot
+   see any `FORTH` word defined after it, the user's own words
+   included. A line that switches environment, such as `HOME`, would
+   also leave the search order changed. Everything a command needs,
+   `MEMO-OPEN` and `EDIT` among them, is in `FORTH`.
 4. **Capture.** The output is the screen's rows from the top through
    the row the cursor ended on — or through the row above, if the
    cursor ended at column 0. If the cursor is still at the top left,
