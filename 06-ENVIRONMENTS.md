@@ -293,8 +293,11 @@ A machine therefore has at most eight environments, home included.
 One bank of fixed slots — the shape `PAL` already uses for its 16
 palette maps — is chosen over a bank per environment because it needs
 no bank creation from Forth source: `ENVIRONMENT` finds its slot with
-ordinary memory reads, and nothing in this document depends on a
-bank-creation primitive `04-FORTH-CORE.md` does not yet specify.
+ordinary memory reads, uses no bank-table slot per environment, and
+keeps every saved screen in one fixed, boot-time bank that a project
+restore always finds in place. `(BANK-CREATE)` (`04-FORTH-CORE.md`
+§6.14) would make a bank per environment possible, but would buy
+nothing this layout lacks.
 
 The bootstrap layer **MUST** write the header and mark every slot free
 before defining `HOME`, which then claims slot 0.

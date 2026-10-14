@@ -62,7 +62,9 @@ the rest of the suite. It does not define a full-screen program editor
 - The environment mechanism (`06-ENVIRONMENTS.md`).
 - The floating-point wordset (`07-FLOATING-POINT.md`), in full.
 - The name-on-the-stack bank words (`04-FORTH-CORE.md` §6.14).
-- Two things the suite does not yet specify (§14).
+- The page bank format and the editor hand-over (`09-MEMO.md` §3,
+  §9), and the `CURSOR-X`/`CURSOR-Y` sysvar constants (`03-SYSVARS.md`
+  §2). §14 confirms nothing else is missing.
 
 ### 2.3 Why the compiled code needs no kernel support
 
