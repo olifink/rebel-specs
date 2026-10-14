@@ -158,7 +158,8 @@ native, that cycle never opens.
 was taken and are not in it: three KERNEL (`(BANK-CREATE)`,
 `(BANK-SAVE)`, `(BANK-LOAD)`) and two BOOTSTRAP (`(BANK-FIND)`,
 `(BANK-REMOVE)`); nor are §6.9's `EKEY`/`EKEY?` or §6.15's `EVALUATE`,
-all KERNEL. Of the parsing bank words built on them, only
+all KERNEL, nor §6.16's module words (`(MODULE-READ)` KERNEL,
+`EVALUATE-LINES` and `MODULE` BOOTSTRAP). Of the parsing bank words built on them, only
 `BANK-SAVE` and `BANK-LOAD` (formerly `BSAVE`/`BLOAD`, §6.11) were ever
 counted; `BANK@`, `BANK-SIZE`, `BANK-CREATE`, `BANK-REMOVE` and
 `BANK-RESIZE` have never been tabulated in this catalog.
@@ -1382,6 +1383,73 @@ This is what lets a program run text it holds as data: MEMO executing
 the line under the cursor (`09-MEMO.md` §6), or a loader feeding an
 environment's source one line at a time.
 
+### 6.16 Source modules
+
+The optional wordsets and environments — floating point, MEMO, Rebel
+BASIC — are Forth source the target ships but does not load at boot. A
+program or a person loads one by name:
+
+```forth
+MODULE FLOAT   F# 2 FSQRT F.
+```
+
+| Word | Effect | |
+|---|---|---|
+| `(MODULE-READ)` | `( addr len -- src-addr src-len \| 0 0 )` | **KERNEL** |
+| `EVALUATE-LINES` | `( addr len -- )` | BOOTSTRAP |
+| `MODULE` | `( "name" -- )` | BOOTSTRAP |
+
+**`(MODULE-READ)`** fetches the source module whose name is `addr len`,
+folded to upper case, through `hal_module_read` (`01-HAL.md` §6.7).
+While the HAL answers *pending* it suspends exactly as `KEY` does
+(§4.3, §4.4). It then makes the text available in Forth-addressable
+memory and returns its address and length, or `0 0` if the target has
+no such module. The text **MUST NOT** become part of the saved
+project. A target holding it in a bank creates the bank already marked
+`REMOVED` (`02-MEMORY-MODEL.md` §4.9), so the bank is inert this
+session and gone at the next table load. It is KERNEL because it
+reaches the HAL and may suspend.
+
+**`EVALUATE-LINES`** interprets text one line at a time, the way a
+target loads its bootstrap source: each line ends at an LF, a CR
+before the LF is dropped, and each line is passed to `EVALUATE`
+(§6.15). `STATE` carries over between lines, so a definition may span
+several. It nests: a line may itself call `EVALUATE-LINES`.
+
+**`MODULE name`** loads module `name` unless it is already loaded, like
+`REQUIRE` in other Forths:
+
+1. `name` is 1 to 8 characters; anything else is an `ABORT`.
+2. A module is *loaded* if a word named `NAME.FTH` (the name in upper
+   case, then `.FTH`) can be found. If so, `MODULE` does nothing.
+3. Otherwise it calls `(MODULE-READ)`. `0 0` is an `ABORT`, reporting
+   the name.
+4. It interprets the text with `EVALUATE-LINES`, with `CONTEXT` set to
+   `CURRENT` for the duration, as the reference `LOAD` does (§7.2), and
+   restores `CONTEXT` afterwards.
+5. Only if that completes does it define the **marker word**
+   `NAME.FTH`, an ordinary `CREATE`d word, in `CURRENT`.
+
+Because the marker is an ordinary dictionary entry, whatever removes
+the module's words removes the marker with them: `EMPTY` and `COLD`
+(§6.12), or `FORGET` of the marker or of anything defined before it.
+The module is then loadable again. A load that `ABORT`s part way
+defines no marker, so `MODULE` tries the whole load again next time.
+Words it already defined stay, and are redefined.
+
+A module that needs another loads it itself, so the dependency is
+satisfied however the outer module was reached:
+
+```forth
+\ first line of a module that needs floating point
+MODULE FLOAT
+```
+
+`MODULE` is the suite's standard delivery for optional source
+(`06-ENVIRONMENTS.md` §9, `07-FLOATING-POINT.md` §7). It does not
+replace block `LOAD` (§9), which interprets source the user wrote,
+held in a project.
+
 ---
 
 ## 7. The bootstrap layer
@@ -1623,5 +1691,6 @@ today:
 | The bootstrap load (§7.1) re-runs after `COLD`, exactly as at genuine first boot | §4.6, §7.1 |
 | `(BANK-FIND)`/`(BANK-CREATE)`/`(BANK-SAVE)`/`(BANK-LOAD)`/`(BANK-REMOVE)` exist with §6.14's stack effects and failure results (`0`/`FALSE`, never `ABORT`); the parsing bank words behave as their §6.14 equivalents | §6.14 |
 | `EKEY` returns key presses only, packed as §6.9 specifies, and suspends as `KEY` does; `EVALUATE` restores the caller's input line and cursor | §6.9, §6.15 |
+| `(MODULE-READ)` suspends while the module HAL is pending and never makes module text part of the saved project; `MODULE` loads a module at most once, as recorded by its `NAME.FTH` marker word, and defines the marker only after a complete load | §6.16 |
 | Any uncaught error clears both stacks, reports via `hal_report_error`, and returns to a clean prompt | §8 |
 | The driving loop executes `ENV-ENTRY` when it is non-zero; recovery and `WARM` set `ENV-REASON` to `2` only when it holds `0` | §5.6, §8, `06-ENVIRONMENTS.md` §5.2 |

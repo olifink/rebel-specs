@@ -315,7 +315,10 @@ calls `>FLOAT` directly.
 - **Delivery is the target's choice.** The §4 words are native, so they
   are part of the target's build. The §5–§6 source may be loaded at
   boot with the bootstrap layer or on demand, the same latitude
-  `04-FORTH-CORE.md` §7.1 and `06-ENVIRONMENTS.md` §9 give.
+  `04-FORTH-CORE.md` §7.1 and `06-ENVIRONMENTS.md` §9 give. Loaded on
+  demand, it is the source module `FLOAT`: `MODULE FLOAT`
+  (`04-FORTH-CORE.md` §6.16) makes the wordset present, and a program
+  that needs it, such as Rebel BASIC, starts with that line.
 - **`COLD`** removes the Forth-source layer along with everything else
   in the dictionary; a target that loads it at boot reloads it.
 - The words go in the `FORTH` vocabulary. None of them collides with a

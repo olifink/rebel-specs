@@ -368,10 +368,11 @@ share one `CHAR` bank where arenas each have their own.
 ## 9. Loading
 
 Environments other than `HOME` are **not** part of the bootstrap layer.
-They are loaded on demand, and this document does not specify the
-delivery mechanism, for the same reason `04-FORTH-CORE.md` §7.1 does
-not: a block-resident source loaded with `LOAD`, a cart, or a host file
-are all valid. What is fixed is the outcome:
+They are loaded on demand. The suite's standard way is a source module
+(`MODULE MEMO`, `04-FORTH-CORE.md` §6.16), which a target that ships
+environments **SHOULD** provide. A block-resident source loaded with
+`LOAD`, or a cart, remain valid alternatives. What is fixed is the
+outcome:
 
 - After loading, exactly one `ENVIRONMENT`-defined word with the
   environment's name exists.

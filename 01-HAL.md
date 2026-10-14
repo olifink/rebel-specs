@@ -1078,6 +1078,50 @@ are plain diagnostic scalars a subsystem sets — not the HAL boolean
 convention (§2.3), since they are not currently read by Forth control
 flow; a target is free to treat them as ordinary `0`/`1` C values.
 
+### 6.7 Optional: source modules
+
+A **source module** is a file of Forth source that the target ships
+alongside its bootstrap source (`04-FORTH-CORE.md` §7.1): the
+floating-point wordset (`07-FLOATING-POINT.fth`), MEMO, Rebel BASIC, or
+anything else the target chooses to provide. Modules are loaded on
+demand with `MODULE name` (`04-FORTH-CORE.md` §6.16). They are not part
+of any project. A module is read-only and belongs to the target's
+build, not to the user's storage.
+
+```c
+typedef enum {
+    MODULE_FOUND   = 0,  /* *data/*len describe the whole source text */
+    MODULE_MISSING = 1,  /* the target has no module of that name     */
+    MODULE_PENDING = 2,  /* not available yet: call again later       */
+} module_status_t;
+
+/* name: 1 to 8 characters, already folded to upper case.
+ * On MODULE_FOUND the bytes stay valid until the next call. */
+module_status_t hal_module_read(const char *name,
+                                const uint8_t **data, size_t *len);
+```
+
+- **Non-blocking**, like every HAL read (§2.2). A target whose modules
+  are compiled in or sit on local media answers `FOUND` or `MISSING`
+  at once. A target that fetches them (a browser over HTTP) starts the
+  fetch on the first call and answers `PENDING` until it completes.
+  The blocking behavior `MODULE` needs is built above the HAL, by the
+  same suspension `KEY` uses (`04-FORTH-CORE.md` §4.4). It is never
+  built by blocking inside this function.
+- **Naming.** Matching `name` to a file is the target's own business:
+  `<name>.fth` beside the bootstrap source, a `/SYSTEM/` directory, a
+  table in flash. A target **MUST** treat a name containing anything
+  but letters and digits as `MISSING`, so a module name can never
+  become a path.
+- **The text is plain source**, one line per LF; a CR before the LF is
+  ignored. No header, no encoding beyond the character codes
+  `10-FONT-CODES.md` defines.
+
+**OPTIONAL**: a target with nothing to load omits it, and `MODULE`
+then reports every name as missing. A target that offers the optional
+wordsets or environments as loadable source **SHOULD** deliver them
+this way, so the same `MODULE FLOAT` works everywhere.
+
 ---
 
 ## 7. Timing
@@ -1279,6 +1323,7 @@ somewhere, not before:
 | `hal_list_dirs` | A | **REQUIRED** if storage-capable | Storage §6.2 |
 | `hal_read_file` | A | **REQUIRED** if storage-capable | Storage §6.2 |
 | `hal_write_file` | A | **REQUIRED** if storage-capable | Storage §6.2 |
+| `hal_module_read` | A | OPTIONAL | Storage §6.7 |
 | `hal_millis` | A | **REQUIRED** | Timing §7.1 |
 | `hal_report_error` | A | **REQUIRED** | Error §8.1 |
 | `hal_mem_copy` | A | **REQUIRED** | Memory §9.1 |
