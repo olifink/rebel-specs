@@ -439,7 +439,7 @@ the project, or on its own with `BANK-SAVE name`, like any other
 ## 8. MEMO as an environment
 
 - **Definition.** MEMO is the source module `MEMO`, loaded with
-  `MODULE MEMO` (`04-FORTH-CORE.md` §6.16). Its source ends with
+  `NEEDS MEMO` (`04-FORTH-CORE.md` §6.16). Its source ends with
   `' MEMO-STEP ENVIRONMENT MEMO`. Loading it does not enter it
   (`06-ENVIRONMENTS.md` §9).
 - **Requirements.** A keyboard delivering raw events (`EKEY`) and a

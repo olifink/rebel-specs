@@ -1084,7 +1084,7 @@ A **source module** is a file of Forth source that the target ships
 alongside its bootstrap source (`04-FORTH-CORE.md` §7.1): the
 floating-point wordset (`07-FLOATING-POINT.fth`), MEMO, Rebel BASIC, or
 anything else the target chooses to provide. Modules are loaded on
-demand with `MODULE name` (`04-FORTH-CORE.md` §6.16). They are not part
+demand with `NEEDS name` (`04-FORTH-CORE.md` §6.16). They are not part
 of any project. A module is read-only and belongs to the target's
 build, not to the user's storage.
 
@@ -1105,7 +1105,7 @@ module_status_t hal_module_read(const char *name,
   are compiled in or sit on local media answers `FOUND` or `MISSING`
   at once. A target that fetches them (a browser over HTTP) starts the
   fetch on the first call and answers `PENDING` until it completes.
-  The blocking behavior `MODULE` needs is built above the HAL, by the
+  The blocking behavior `NEEDS` needs is built above the HAL, by the
   same suspension `KEY` uses (`04-FORTH-CORE.md` §4.4). It is never
   built by blocking inside this function.
 - **Naming.** Matching `name` to a file is the target's own business:
@@ -1117,10 +1117,10 @@ module_status_t hal_module_read(const char *name,
   ignored. No header, no encoding beyond the character codes
   `10-FONT-CODES.md` defines.
 
-**OPTIONAL**: a target with nothing to load omits it, and `MODULE`
+**OPTIONAL**: a target with nothing to load omits it, and `NEEDS`
 then reports every name as missing. A target that offers the optional
 wordsets or environments as loadable source **SHOULD** deliver them
-this way, so the same `MODULE FLOAT` works everywhere.
+this way, so the same `NEEDS FLOAT` works everywhere.
 
 ---
 

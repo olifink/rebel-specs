@@ -632,8 +632,8 @@ corresponding Forth words are specified, programs use `CALL`.
   `' BASIC-STEP ENVIRONMENT BASIC`. Its other words live in a
   vocabulary of their own (`06-ENVIRONMENTS.md` §9).
 - **Loading.** BASIC is the source module `BASIC`, loaded with
-  `MODULE BASIC` (`04-FORTH-CORE.md` §6.16). Its source begins with
-  `MODULE FLOAT`, so the float wordset is loaded first; on a target
+  `NEEDS BASIC` (`04-FORTH-CORE.md` §6.16). Its source begins with
+  `NEEDS FLOAT`, so the float wordset is loaded first; on a target
   without it that line aborts and nothing of BASIC is defined. Loading
   initializes the work bank (§10.4) and does not enter BASIC.
 - **The step word**, each time it is called: reads and clears

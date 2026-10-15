@@ -316,7 +316,7 @@ calls `>FLOAT` directly.
   are part of the target's build. The §5–§6 source may be loaded at
   boot with the bootstrap layer or on demand, the same latitude
   `04-FORTH-CORE.md` §7.1 and `06-ENVIRONMENTS.md` §9 give. Loaded on
-  demand, it is the source module `FLOAT`: `MODULE FLOAT`
+  demand, it is the source module `FLOAT`: `NEEDS FLOAT`
   (`04-FORTH-CORE.md` §6.16) makes the wordset present, and a program
   that needs it, such as Rebel BASIC, starts with that line.
 - **`COLD`** removes the Forth-source layer along with everything else

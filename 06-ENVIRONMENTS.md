@@ -369,7 +369,7 @@ share one `CHAR` bank where arenas each have their own.
 
 Environments other than `HOME` are **not** part of the bootstrap layer.
 They are loaded on demand. The suite's standard way is a source module
-(`MODULE MEMO`, `04-FORTH-CORE.md` §6.16), which a target that ships
+(`NEEDS MEMO`, `04-FORTH-CORE.md` §6.16), which a target that ships
 environments **SHOULD** provide. A block-resident source loaded with
 `LOAD`, or a cart, remain valid alternatives. What is fixed is the
 outcome:
