@@ -281,6 +281,17 @@ condenses are all just `kind=1` from Rebel's point of view. What
 structure or flattened text) is explicitly not designed here — first
 concrete use case needed before that's worth fixing.
 
+**Settled (2026-10-16): condensing is the norm, and nothing streams.**
+Large or unbounded answers are condensed by the stick into a small
+postbox response, never passed through as is. That covers an HTTP/HTML
+page, which is summarized or extracted on the stick, and an AI service,
+a target type like any other, whose answer is likewise condensed rather
+than streamed from the model. Rebel always receives one complete,
+Rebel-sized response per request, so the box lifecycle in §4 needs no
+partial or streaming state. A consequence: the u16 lengths and offsets
+(§6, §7), which cap a response at 64 KiB, are not a practical limit.
+`raw` stays available for answers that are already small.
+
 ## 9. Setup: WiFi, time, credentials
 
 **Recommendation, not yet confirmed:** keep WiFi/credential provisioning
@@ -360,7 +371,9 @@ Written so the stick firmware can be built against this section alone:
 4. **Stick-side memory pressure** if Rebel never sends `POSTBOX_RELEASE`
    (§12 item 5) — no eviction/timeout policy defined.
 5. **`condensed` format** (§8) — entirely undefined pending a first real
-   consumer (Rebel-Net telex screens are the likely first case).
+   consumer (Rebel-Net telex screens are the likely first case). More
+   central now that condensing is the norm for every large answer, AI
+   included (§8, settled 2026-10-16).
 6. **Service types beyond HTTP** (`0x02`-`0x05`, §5) — reserved
    placeholders only; each needs its own `config`/response spec before
    it's real.
