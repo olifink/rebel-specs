@@ -256,8 +256,11 @@ system stays HAL-side compiled-in structs, `rebel-rom/docs/FONT-SYSTEM.md`
 
 ## 9. `SPRITE`
 
-Base `0x100`, 64 bytes reserved. Fully reserved, same status and
-reasoning as `FONT` (§8).
+Base `0x100`, 64 bytes reserved.
+
+| Offset | Field | Required? |
+|---|---|---|
+| 0 | `SPRITE-BASE` | **REQUIRED** if the target offers sprite/tile words: base address of the active `SPRT` bank, `0` = none (`13-GAME-LOOP.md` §6.1). Same pattern as `FONT-BASE` (§8) |
 
 ## 10. `STORAGE`
 

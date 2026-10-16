@@ -1451,11 +1451,11 @@ NEEDS FLOAT
 replace block `LOAD` (§9), which interprets source the user wrote,
 held in a project.
 
-### 6.17 Frames, time and held keys
+### 6.17 Frames, time, held keys and sprites
 
-What a program needs to run at the display's pace, measure time, and
-poll the keyboard instead of waiting on it, most of all a game
-(`13-GAME-LOOP.md`).
+What a program needs to run at the display's pace, measure time, poll
+the keyboard instead of waiting on it, and draw sprites, most of all a
+game (`13-GAME-LOOP.md`).
 
 | Word | Effect | |
 |---|---|---|
@@ -1463,10 +1463,13 @@ poll the keyboard instead of waiting on it, most of all a game
 | `MS@` | `( -- n )` — milliseconds since boot, from `hal_millis` (`01-HAL.md` §7.1), wrapping at 2^32. Compare differences, never absolute values. | **KERNEL** |
 | `MS` | `( n -- )` — waits at least `n` milliseconds, calling `VSYNC` while it waits. | BOOTSTRAP |
 | `KEY-DOWN?` | `( usage -- flag )` — `TRUE` while the key with that usage code is held (`01-HAL.md` §4.3). | BOOTSTRAP |
-| `FRAME-COUNT` `KEYS-DOWN` | `( -- addr )` — the sysvars' addresses (`03-SYSVARS.md` §6, §7). | BOOTSTRAP |
+| `FRAME-COUNT` `KEYS-DOWN` `SPRITE-BASE` | `( -- addr )` — the sysvars' addresses (`03-SYSVARS.md` §6, §7, §9). | BOOTSTRAP |
+| `SPRITE` | `( x y n -- )` — draws entry `n` of the active sprite bank (`SPRITE-BASE`) with its top-left at pixel `(x, y)`, through `hal_blit_sprite` (`01-HAL.md` §3.8). Draws nothing with no active bank, a bank without a valid `11-SPRITE-BANK.md` header, an `n` outside its entry count, or an entry that would run past the end of the bank. | **KERNEL** |
+| `TILE` | `( col row n -- )` — `SPRITE` at `(col × CHAR-CELL-W, row × CHAR-CELL-H)`. | BOOTSTRAP |
 
 `VSYNC` is KERNEL because it may suspend, like `KEY`. `MS@` is KERNEL
-because it reaches the HAL. `MS` and `KEY-DOWN?` are a loop over those
+because it reaches the HAL. `SPRITE` is KERNEL because it hands the HAL
+a resolved byte span (`01-HAL.md` §2.1), which Forth cannot form. `MS` and `KEY-DOWN?` are a loop over those
 and a bit test, so Forth source suffices.
 
 A target with no display has no frames: its `VSYNC` returns at once,

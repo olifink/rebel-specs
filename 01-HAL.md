@@ -1305,12 +1305,6 @@ somewhere, not before:
   primitive semantics are `04-FORTH-CORE.md`'s job, not this
   document's; noted here only so their absence from every list above
   isn't mistaken for an oversight.
-- **`SPRITE` sysvar group.** The blit itself is now HAL surface (§3.8),
-  but it takes everything it needs as parameters; no sysvar field (an
-  active-bank pointer analogous to `FONT-BASE`, say) is defined, since
-  no target has a Forth-addressable sprite bank yet to say what one
-  would need to hold. (`FONT` is no longer deferred — see §3.7, added
-  M59 once Rebel-Sim actually had one.)
 - **Per-channel-type configuration** (§5). A future non-keyboard channel
   with real configuration needs — a radio link's frequency/spreading-
   factor parameters, for instance — will need somewhere to hold that

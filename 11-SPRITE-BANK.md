@@ -34,8 +34,9 @@ distinguished by `name`, not `tag` — so a project with several sprite
 sheets resident at once (a UI tileset and a game-object spritesheet, say)
 is several `SPRT`-tagged banks with different names, each independently
 loadable/activatable, not one bank multiplexing several logical sheets.
-`BUILD-BANK` (below) operates on one such bank by name, same as
-`BANK@`/`BANK-SIZE` (`04-FORTH-CORE.md` §6.10) do for any other tag.
+One of them at a time is the **active** bank, the one `SPRITE` and
+`TILE` draw from, chosen by storing its base in `SPRITE-BASE`
+(`03-SYSVARS.md` §9, `13-GAME-LOOP.md` §6).
 
 A single bank is still capped at `MAX_BANK_SIZE` (4 MiB,
 `02-MEMORY-MODEL.md` §4.3) like any other carved bank — a sprite sheet
@@ -161,13 +162,14 @@ where `8` is the header, `palette_size = 64` and
 
 ### Offset cache
 
-Recomputing this sum on every blit is wasteful in a game loop. When a
-bank is activated, a word (tentatively `BUILD-BANK`) walks the entry
-list once and populates an in-memory offset cache — analogous to
-building a dictionary from source. The cache is derived and disposable:
-it can be discarded and rebuilt from the bank at any time, and nothing
-depends on its contents surviving a raw memory poke to the bank itself.
-The persisted bank format stays minimal; the cache is scratch state.
+A target **MAY** cache entry offsets rather than recompute the sum on
+every blit. A cache is derived and disposable, and it **MUST NOT** go
+stale: a sheet reloaded into the same bank, or entry dimensions poked
+in place, must draw correctly on the next blit. Recomputing on each
+blit, a sum over the entries before `n`, is always correct and is cheap
+for realistic sheets. The persisted bank format stays minimal either
+way. No word is needed to "build" a bank: storing its base in
+`SPRITE-BASE` is all that activating one takes.
 
 ## Sprites vs. tiles at blit time
 
@@ -183,8 +185,8 @@ addressing:
 
 No format field distinguishes the two uses — an entry is just a bitmap
 of a given size; whether it's blitted freely or grid-snapped is a
-decision made by the calling word (e.g. `SPRITE!` vs `TILE!`), not a
-property of the bank.
+decision made by the calling word, `SPRITE` or `TILE`
+(`04-FORTH-CORE.md` §6.17), not a property of the bank.
 
 ## Explicitly deferred
 
@@ -201,10 +203,9 @@ property of the bank.
 
 ## Open questions
 
-- Exact word names for `BUILD-BANK`, `SPRITE!`, `TILE!`.
-  `13-GAME-LOOP.md` §6 proposes `SPRITE`/`TILE` over an active bank set
-  through `SPRITE-BASE`, which makes `BUILD-BANK` unnecessary. That
-  lands here when it is implemented.
+- ~~Exact word names for `BUILD-BANK`, `SPRITE!`, `TILE!`.~~ Resolved:
+  `SPRITE`/`TILE` over the active bank at `SPRITE-BASE`
+  (`04-FORTH-CORE.md` §6.17). No `BUILD-BANK` is needed.
 - ~~Whether bank metadata (entry count, bank size) lives in a small fixed
   header before the palette, or is tracked separately by the loader.~~
   Resolved: the 8-byte header above carries the entry count, needed

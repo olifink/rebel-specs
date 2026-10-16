@@ -76,17 +76,11 @@ Offset  Size   Contents
 1       1      solidity flags
 ```
 
-**Open gap, not resolved here:** nothing in this format says *which*
-`SPRT`-tagged bank (`11-SPRITE-BANK.md`) a room's tile indices resolve
-against, and `02-MEMORY-MODEL.md` §4.7 allows several to be resident at
-once, distinguished by name. `03-SYSVARS.md` §9's `SPRITE` group is
-fully reserved with no fields defined yet — the natural home for an
-"active tile bank" pointer, the same pattern `PALETTE-BASE`/`FONT-BASE`
-already establish (`03-SYSVARS.md` §6/§8) — but that's a candidate, not
-a decision made here. Until resolved, treat a room's tile indices as
-resolving against a single implicit global tile bank, one per world at
-most (not per-room), consistent with the current "one palette" scoping
-elsewhere.
+**Which sprite bank a room's tiles come from:** the active one, the
+bank whose base is in `SPRITE-BASE` (`03-SYSVARS.md` §9,
+`13-GAME-LOOP.md` §6.1). A game that uses several tile sheets stores the
+right one there before drawing a room. [Resolved] This was previously
+an open gap.
 
 ### Solidity flags (byte 1)
 

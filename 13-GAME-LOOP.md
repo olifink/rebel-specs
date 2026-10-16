@@ -173,8 +173,8 @@ resolve against the active sprite bank.
 (`01-HAL.md` §2.1), which Forth cannot form. The portable work that
 `01-HAL.md` §3.8 assigns to the portable layer happens inside it:
 finding the entry, bounds-checking `n`, and producing the palette. That
-includes the offset cache (`11-SPRITE-BANK.md`), rebuilt whenever
-`SPRITE-BASE` changes, so no separate `BUILD-BANK` word is needed. An
+includes the offset cache (`11-SPRITE-BANK.md`), optional and never
+stale (`11-SPRITE-BANK.md`), so no separate `BUILD-BANK` word is needed. An
 `n` out of range draws nothing. With no active bank, `SPRITE` does
 nothing.
 
@@ -297,11 +297,11 @@ Each lands with the implementation. Rows marked **Done** have landed.
 | `01-HAL.md` §4.3 | **Done:** the Keyboard Module maintains `KEYS-DOWN`. |
 | `03-SYSVARS.md` §6 | **Done:** `SCREEN` offset 40, `FRAME-COUNT`. |
 | `03-SYSVARS.md` §7 | **Done:** `KEYBOARD` offsets 8–39, `KEYS-DOWN`, 256 bits as 8 cells. |
-| `03-SYSVARS.md` §9 | `SPRITE` offset 0: `SPRITE-BASE`. The group stops being reserved. |
-| `04-FORTH-CORE.md` §6.17 | **Done:** `VSYNC`, `MS@` (KERNEL); `MS`, `KEY-DOWN?` (BOOTSTRAP). Still to come with sprites: `SPRITE` (KERNEL), `TILE` (BOOTSTRAP). |
+| `03-SYSVARS.md` §9 | **Done:** `SPRITE` offset 0, `SPRITE-BASE`. The group stops being reserved. |
+| `04-FORTH-CORE.md` §6.17 | **Done:** `VSYNC`, `MS@`, `SPRITE` (KERNEL); `MS`, `KEY-DOWN?`, `TILE` (BOOTSTRAP). |
 | `09-MEMO.md` §7 | `MEMO-LOAD`. |
-| `11-SPRITE-BANK.md` | `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`. (Its entry-count header is already in.) |
-| `12-WORLD-MAP.md` | Tile indices resolve against `SPRITE-BASE`; the open gap closes. |
+| `11-SPRITE-BANK.md` | **Done:** `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`; the entry-count header; an offset cache optional and never stale. |
+| `12-WORLD-MAP.md` | **Done:** tile indices resolve against `SPRITE-BASE`; the open gap is closed. |
 
 ## 12. Conformance checklist
 
