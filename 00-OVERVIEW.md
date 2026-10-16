@@ -71,6 +71,7 @@ reference target.
 | 07 | [`07-FLOATING-POINT.fth`](07-FLOATING-POINT.fth) | **v1.1**, draft | The normative reference source for `07-FLOATING-POINT.md`'s Forth layer: derived words, elementary functions, text conversion. |
 | 08 | [`08-BASIC.md`](08-BASIC.md) | **v1.1**, draft | Rebel BASIC: a Sinclair-flavoured BASIC that runs as an environment and compiles program text to Forth threaded code at `RUN`. Typed by name suffix, optional line numbers and labels, stop/continue debugging, calls into Forth. Loadable; needs `06` and `07`. |
 | 09 | [`09-MEMO.md`](09-MEMO.md) | **v1.1**, draft | MEMO: a full-screen, line-centric, overwrite-mode page editor that runs as an environment, where any line can be executed as Forth. Edits its own documents, BASIC programs, and 64 × 16 Forth screens. Defines the page bank format. Loadable; needs `06`. |
+| 13 | [`13-GAME-LOOP.md`](13-GAME-LOOP.md) | **v1.1**, draft, design only | How a game runs: an environment whose step word draws one frame, paced by `VSYNC` and a frame counter, reading held keys, drawing sprites and tiles from the active `SPRT` bank, and the `GAME` engine module (entities, render list, collision). Loadable; needs `06`. |
 
 ### 3.3 Data formats
 
