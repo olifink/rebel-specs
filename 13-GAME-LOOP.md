@@ -141,6 +141,11 @@ sees every press and release, so it keeps that state.
 |---|---|---|
 | `KEY-DOWN?` | `( usage -- flag )` — `TRUE` while that key is held. | BOOTSTRAP: a bit test on `KEYS-DOWN` |
 
+Auto-repeat (`01-HAL.md` §4.3) adds repeated presses to the event
+stream while a key is held, marked by bit 24 of `EKEY`'s event, and
+never touches `KEYS-DOWN`. A game that wants no repeats stores `0` in
+`REPEAT-DELAY` when it starts.
+
 Event reading and state reading coexist. A game reads `KEY-DOWN?` for
 movement, and `EKEY?`/`EKEY` for one-shot actions like pausing. Events
 it never reads pile up in the queue and are dropped when it fills, so a

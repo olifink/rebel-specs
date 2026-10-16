@@ -885,6 +885,12 @@ cell:
 | 0–7 | `usage_code` (`01-HAL.md` §4.2) |
 | 8–15 | Modifier bitmask at the time of the press (`01-HAL.md` §4.4) |
 | 16–23 | Translated character, `0` if the key has none |
+| 24 | Set if the press is an auto-repeat (`01-HAL.md` §4.3), clear for a real key-down |
+
+An auto-repeat is a press like any other, so `KEY` and `ACCEPT` see it
+as one more character. Bit 24 lets a program reading `EKEY` for one-shot
+actions ignore repeats, or it may turn repeat off with
+`0 REPEAT-DELAY !` (`03-SYSVARS.md` §7).
 
 Key releases and modifier-only events (`usage_code` `0x80`–`0x87`) are
 consumed and skipped; a modifier is seen only through bits 8–15 of the

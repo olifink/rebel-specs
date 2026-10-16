@@ -572,6 +572,28 @@ tracking — is portable (§4.3).
   *before* queueing the event, so the state is right even when the
   queue is full and the event is dropped. Reading events never changes
   it. `KEY-DOWN?` (`04-FORTH-CORE.md` §6.17) tests it.
+- **Auto-repeat.** The module, not the keyboard hardware, repeats a
+  held key, so every target repeats the same way. The most recent
+  non-modifier key pressed and still held is the *repeating key*:
+  pressing another key makes that one the repeating key, and releasing
+  it stops the repeat. The modifier pseudo-codes never repeat. Once the
+  repeating key has been held for `REPEAT-DELAY` milliseconds, the
+  module queues a press of it, with the modifiers held at that moment
+  and marked as a repeat, and then one more every `REPEAT-RATE`
+  milliseconds (`03-SYSVARS.md` §7: defaults 500 and 50). A
+  `REPEAT-DELAY` of `0` turns repeat off. A repeat changes neither
+  `KEYS-DOWN` nor `MODIFIERS`. The module needs time for this, so the
+  target calls one more Type B entry point regularly while a key is
+  held: from `screen_frame()` (§3.9) on a display target, or from a
+  timer on a headless one:
+
+  ```c
+  /* Reads hal_millis and queues at most one due repeat. */
+  void keyboard_tick(void);
+  ```
+
+  At most one repeat is queued per call, so a long gap between calls
+  never floods the queue.
 - **Event queue**: a ring buffer of translated events,
   RECOMMENDED minimum depth 32 (this models realistic input burst rates,
   not a hard architectural limit — a target MAY use a deeper queue). On
@@ -1329,6 +1351,7 @@ somewhere, not before:
 | `hal_draw_pixel`/`read_pixel`/`line`/`rect`/`rect_outline` | A | OPTIONAL | Screen §3.4 |
 | `hal_blit_sprite` | A | OPTIONAL; **REQUIRED** if the target offers sprite/tile words | Screen §3.8 |
 | `screen_frame` | B (target calls in) | **REQUIRED** if display-capable | Screen §3.9 |
+| `keyboard_tick` | B (target calls in) | **REQUIRED** if input-capable | Keyboard §4.3 |
 | `PAL`/`ATTR` banks + `PALETTE-BASE` field | data/bank | **REQUIRED** if display-capable | Screen §3.6, `02-MEMORY-MODEL.md` §4.6 |
 | `keyboard_push_raw_event` | B (target calls in) | **REQUIRED** if input-capable | Keyboard §4.2 |
 | `keyboard_has_event` / `keyboard_read_event` | portable | n/a — never reimplement | Keyboard §4.3 |

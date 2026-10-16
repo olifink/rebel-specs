@@ -239,6 +239,8 @@ Base `0x080`, 64 bytes reserved. Field meanings: `01-HAL.md` §4.6.
 | 0 | `MODIFIERS` | REQUIRED |
 | 4 | `KEYBOARD-COUNT` | OPTIONAL |
 | 8–39 | `KEYS-DOWN` | **REQUIRED** if input-capable: 256 bits as 8 cells, bit *u* set while key *u* is held (`01-HAL.md` §4.3) |
+| 40 | `REPEAT-DELAY` | **REQUIRED** if input-capable: milliseconds before a held key auto-repeats, `0` = off; boot value 500 (`01-HAL.md` §4.3) |
+| 44 | `REPEAT-RATE` | **REQUIRED** if input-capable: milliseconds between auto-repeats; boot value 50 |
 
 ## 8. `FONT`
 
