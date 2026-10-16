@@ -53,7 +53,12 @@ the stick.
    whether to add a write side or a separate duplex type is still open
    in `CHANNELS-DESIGN.md`. Define a small link HAL that is not a
    `Channel`: attach and detach, non-blocking read, write, and
-   presence.
+   presence. Discussed 2026-10-16: the stick link should **not** be a
+   two-way `Channel`. A channel is what `KEY` reads, typed characters,
+   while the stick link carries framed protocol messages that nothing
+   would ever read keys from. The postbox module sits on a link, and so
+   could the remote terminal's board side. See item 11 for the separate
+   question of channel output.
 3. **The postbox module as portable code**, written once and shared by
    every target like the keyboard module (`01-HAL.md` §4.3). It owns the
    box states and the ready mask, and runs the frame parser. Its drain
@@ -101,3 +106,22 @@ the stick.
     - `config` and response specs for each service type beyond HTTP
       (item 6), AI now among them;
     - Wi-Fi and credential provisioning (item 7).
+11. **Stream output on a channel, for headless and serial consoles.**
+    The constraint that channels are input-only (`01-HAL.md` §5.2) is
+    right for display targets, whose screen is a framebuffer of
+    positioned, coloured text that MEMO and games depend on and that a
+    byte stream cannot carry. But a headless target, driven over a UART
+    with no screen, has nowhere to send `EMIT`/`TYPE` output. The same
+    goes for a plain serial console, or a telnet-like session over the
+    stick. Proposal (2026-10-16), to settle when a headless target or a
+    stick console is actually built:
+    - relax "input only" to "a channel may have a write side for stream
+      output";
+    - a session bound to such a channel also sends `EMIT`/`TYPE`/`CR` to
+      it, following §5.6's session model;
+    - on a display target the screen HAL is written as now; on a
+      headless one the channel is the only output;
+    - positioned and graphics output (`AT-XY`, `CHAR!`, sprites) never
+      goes through a channel;
+    - §5.2's wording that output "was never channel-shaped" is true of
+      the screen only, and changes accordingly.
