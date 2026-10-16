@@ -49,16 +49,36 @@ banks, not a format change here.
 4 bits per pixel (4bpp), fixed. This matches the 16-entry palette below
 exactly: one byte encodes two horizontal pixels.
 
+### Header
+
+Every bank begins with an 8-byte header:
+
+```
+Offset  Size   Contents
+0       1      magic 'S'
+1       1      magic 'P'
+2       1      version, 1
+3       1      reserved, 0
+4       4      entry count, one cell
+```
+
+The magic tells a reader a sprite bank from arbitrary bytes, the same
+way a page bank's `'P','G'` does (`09-MEMO.md` §3.1). The entry count
+is what bounds an entry index: a blit of entry `n` with `n` not below
+the count draws nothing. Eight bytes keep the palette, which follows,
+cell-aligned, so a target may still hand `hal_blit_sprite` a pointer
+straight into it (`01-HAL.md` §3.8).
+
 ### Palette
 
-Every bank begins with a 16-entry palette, each entry a 32-bit
+After the header comes a 16-entry palette, each entry a 32-bit
 `0xRRGGBB` value — same entry format as `02-MEMORY-MODEL.md` §4.6's
 `PAL` bank (no alpha channel; a color either is or isn't drawn, decided
 by the index-0 convention below, not by a per-entry alpha byte).
 
 ```
 Offset  Size   Contents
-0       64     16 x 0xRRGGBB palette entries (4 bytes each)
+8       64     16 x 0xRRGGBB palette entries (4 bytes each)
 ```
 
 Palette index 0 is reserved as the transparent/color-key index. A blit
@@ -79,8 +99,8 @@ is actually resolved.
 
 ### Entry list
 
-Following the palette, a list of entry headers, one per sprite/tile
-definition:
+Following the palette, at offset 72, a list of entry headers, one per
+sprite/tile definition:
 
 ```
 Offset  Size   Contents
@@ -90,8 +110,7 @@ Offset  Size   Contents
 3       1      reserved (padding / future use)
 ```
 
-4 bytes per entry header, entry count fixed at bank-build time and
-known from the bank's own metadata (not stored per-entry).
+4 bytes per entry header, as many as the header's entry count.
 
 ### Attribute flags (byte 2 of entry header)
 
@@ -134,10 +153,11 @@ never leave derived state stale or invalid.
 Offset of entry `n`'s pixel data is:
 
 ```
-offset[n] = palette_size + entry_list_size + Σ entry_size(i)   for i < n
+offset[n] = 8 + palette_size + entry_list_size + Σ entry_size(i)   for i < n
 ```
 
-where `palette_size = 64` and `entry_list_size = 4 * entry_count`.
+where `8` is the header, `palette_size = 64` and
+`entry_list_size = 4 * entry_count`.
 
 ### Offset cache
 
@@ -181,10 +201,12 @@ property of the bank.
 
 ## Open questions
 
-- Exact opcode/word names for `BUILD-BANK`, `SPRITE!`, `TILE!` — to be
-  finalized against `CORE-VOCABULARY.md` conventions once graphics
-  primitives (points/lines) land and blit words are drafted alongside
-  them.
-- Whether bank metadata (entry count, bank size) lives in a small fixed
-  header before the palette, or is tracked separately by the loader.
-  Currently assumed external to keep the described layout unchanged.
+- Exact word names for `BUILD-BANK`, `SPRITE!`, `TILE!`.
+  `13-GAME-LOOP.md` §6 proposes `SPRITE`/`TILE` over an active bank set
+  through `SPRITE-BASE`, which makes `BUILD-BANK` unnecessary. That
+  lands here when it is implemented.
+- ~~Whether bank metadata (entry count, bank size) lives in a small fixed
+  header before the palette, or is tracked separately by the loader.~~
+  Resolved: the 8-byte header above carries the entry count, needed
+  for `SPRITE` to bounds-check an index (`13-GAME-LOOP.md` §10). The
+  bank's size is the bank's own.

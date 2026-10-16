@@ -114,40 +114,39 @@ Offset  Size   Contents
 1       1      height (cell count, y axis)
 2       1      depth  (cell count, z axis — 1 for top-down/platformer
                         rooms that don't use elevation)
-3       1      reserved
+3       1      exit count
 ```
 
 Cell data follows immediately, `width * height * depth` cells, 2 bytes
 each, in the same row-major convention used elsewhere (x fastest, then
-y, then z).
+y, then z). The room's exits follow the cell data, `exit count` of them,
+8 bytes each (§Exits). A room's total size is therefore
+`4 + 2 × width × height × depth + 8 × exit count` bytes.
 
 ## Exits
 
-Each room carries a fixed list of exits. An exit is a directional edge
-from a cell (or cell range) in this room to a destination room and
-entry point.
+Each room carries a list of exits, `exit count` of them (room header,
+§Room dimensions), stored after its cell data. An exit is a directional
+edge from one cell in this room to an entry cell in a destination room.
 
 ```
 Offset  Size   Contents
 0       1      direction (N/S/E/W/UP/DOWN — see below)
-1       1      source cell reference (which edge cell(s) trigger this exit)
-2       1      destination room index
-3       1      destination entry cell reference
+1       1      destination room index
+2       1      source x  ┐ the cell in this room that fires the exit
+3       1      source y  │
+4       1      source z  ┘
+5       1      entry x   ┐ where the player is placed in the
+6       1      entry y   │ destination room
+7       1      entry z   ┘
 ```
 
-**Correctness gap, not a memory-model issue — an internal one:** a
-"cell reference" here is 1 byte, but the room header (below) allows
-width/height/depth each up to 255 independently, so a room whose
-`width * height * depth` exceeds 256 has cells no single byte can
-address as a linear index, and no byte in this 4-byte layout has room
-for a packed (x, y, z) triple either. Exits fire from a room's edge, so
-in practice only two of the three axes ever vary for a given direction
-(e.g. a `NORTH`/`SOUTH` exit's source only needs an (x, z) pair, `y`
-being fixed at the edge) — that may be enough to fit one byte per axis
-pair for realistic room sizes, but this format doesn't yet say so
-explicitly, and a room where even the two relevant axes multiply past
-256 (e.g. a 32x32 isometric floor) still overflows. Needs resolving
-before this is implemented, not just before it's optimized.
+Cells are addressed by explicit `(x, y, z)`, never a linear index, so
+every cell of every room is addressable: each axis is at most 255,
+which is exactly what the room header can describe. [Revised] An
+earlier layout packed each cell into one byte as a linear index, which
+overflowed once `width * height * depth` passed 256. An opening several
+cells wide is several exits with the same destination.
 
 ### Direction encoding
 
@@ -178,13 +177,16 @@ list.
 ```
 Offset  Size   Contents
 0       1      room count
-1..     -      room count x (offset to room header)
+1       3      reserved, 0
+4       -      the rooms, back to back, room 0 first
 ```
 
-Room offsets are computed from room sizes at world-build time, same
-approach as sprite bank entry offsets — not stored redundantly, kept
-consistent with the poke-able-memory principle: room dimensions are
-the single source of truth, offsets are derived.
+Room offsets are not stored. They are derived by walking the rooms,
+each one's size known from its own header (§Room dimensions): the same
+approach as sprite bank entry offsets, and consistent with the
+poke-able-memory principle. Room dimensions and exit counts are the
+single source of truth, and an offset cache built from them is
+disposable. The 3 reserved bytes keep the first room cell-aligned.
 
 ## Movement granularity (cell-locked default, continuous optional)
 
@@ -197,7 +199,7 @@ position**:
   rendered smoothly by interpolating render position from the
   previous cell to the next over N frames; the logical position itself
   still changes atomically. This interpolation is game-loop/entity
-  state (see `EXECUTION-LOOP.md`), not part of this format.
+  state (`13-GAME-LOOP.md`), not part of this format.
 - **Continuous** — entity tracks a sub-cell render position directly
   as its authoritative position; the grid is consulted only for
   collision queries (is the cell ahead blocking/platform). No change
@@ -231,8 +233,7 @@ and screen placement out of stored data (see `11-SPRITE-BANK.md`).
 ## Open questions
 
 - Exact word names for room load/unload and exit-fire handling — to be
-  finalized against `CORE-VOCABULARY.md` and `EXECUTION-LOOP.md`
-  conventions once the game-loop primitives are drafted.
+  finalized alongside `13-GAME-LOOP.md`'s `GAME` module.
 - Whether the designer tool authors rooms independently and links them
   via a separate pass, or builds the whole world graph as one editing
   session. Affects tooling, not this format.

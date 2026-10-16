@@ -274,11 +274,9 @@ Collisions are not stored.
 
 ## 10. Open questions
 
-- **The sprite bank's entry count.** `11-SPRITE-BANK.md` says the count
-  is "known from the bank's own metadata", but the format has no field
-  for it: the palette starts at offset 0. `SPRITE` cannot bounds-check
-  `n` without it. A count is needed before §6 can be implemented. The
-  simplest option is a 4-byte header before the palette.
+- ~~**The sprite bank's entry count.**~~ Resolved in
+  `11-SPRITE-BANK.md`: an 8-byte header (`'S','P'`, version, entry
+  count) now precedes the palette.
 - **Layer order** in the render list: how many layers, and whether
   isometric depth sorting (`12-WORLD-MAP.md`) is `RENDER`'s job or the
   game's.
@@ -301,7 +299,7 @@ Nothing below is changed yet. Each lands with the implementation.
 | `03-SYSVARS.md` §9 | `SPRITE` offset 0: `SPRITE-BASE`. The group stops being reserved. |
 | `04-FORTH-CORE.md` §6 | `VSYNC`, `MS@`, `SPRITE` (KERNEL); `MS`, `KEY-DOWN?`, `TILE` (BOOTSTRAP). |
 | `09-MEMO.md` §7 | `MEMO-LOAD`. |
-| `11-SPRITE-BANK.md` | An entry-count field (§10); `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`. |
+| `11-SPRITE-BANK.md` | `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`. (Its entry-count header is already in.) |
 | `12-WORLD-MAP.md` | Tile indices resolve against `SPRITE-BASE`; the open gap closes. |
 
 ## 12. Conformance checklist
