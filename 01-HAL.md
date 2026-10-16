@@ -1139,8 +1139,10 @@ typedef enum {
     MODULE_PENDING = 2,  /* not available yet: call again later       */
 } module_status_t;
 
-/* name: 1 to 8 characters, already folded to upper case.
- * On MODULE_FOUND the bytes stay valid until the next call. */
+/* name: NAME or NAME.EXT -- 1 to 8 characters, optionally a dot and
+ * 1 to 3 more -- already folded to upper case. NAME alone is Forth
+ * source, NAME.FTH; NAME.EXT is any other file the target ships beside
+ * it. On MODULE_FOUND the bytes stay valid until the next call. */
 module_status_t hal_module_read(const char *name,
                                 const uint8_t **data, size_t *len);
 ```
@@ -1154,12 +1156,16 @@ module_status_t hal_module_read(const char *name,
   built by blocking inside this function.
 - **Naming.** Matching `name` to a file is the target's own business:
   `<name>.fth` beside the bootstrap source, a `/SYSTEM/` directory, a
-  table in flash. A target **MUST** treat a name containing anything
-  but letters and digits as `MISSING`, so a module name can never
-  become a path.
-- **The text is plain source**, one line per LF; a CR before the LF is
-  ignored. No header, no encoding beyond the character codes
-  `10-FONT-CODES.md` defines.
+  table in flash. A target **MUST** treat any other shape of name,
+  anything but letters and digits with at most one extension, as
+  `MISSING`, so a module name can never become a path.
+- **Source** (a name without an extension) is plain text, one line per
+  LF; a CR before the LF is ignored. No header, no encoding beyond the
+  character codes `10-FONT-CODES.md` defines.
+- **Other files** are what a module needs besides source, such as the
+  sprite sheet a game ships with. One in the project-asset format
+  (§6.3: `'R','A'`, the bank tag, the payload) is loaded into a bank by
+  `LOAD-ASSET` (`04-FORTH-CORE.md` §6.16).
 
 **OPTIONAL**: a target with nothing to load omits it, and `NEEDS`
 then reports every name as missing. A target that offers the optional

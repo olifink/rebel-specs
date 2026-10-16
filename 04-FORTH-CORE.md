@@ -1452,6 +1452,15 @@ satisfied however the outer module was reached:
 NEEDS FLOAT
 ```
 
+**Assets.** A module often needs data as well as source: a game its
+sprite sheet. The target ships such a file beside the module, in the
+project-asset format (`01-HAL.md` §6.3), and the module loads it:
+
+| Word | Effect | |
+|---|---|---|
+| `(LOAD-ASSET)` | `( name-a name-l file-a file-l -- slot \| 0 )` — reads `file` through `(MODULE-READ)`; if it starts with `'R','A'`, makes its payload the contents of the bank named `name`, zero-padded, creating that bank with the file's tag if it does not exist. `0` for a missing file, one that is not an asset, or a bank too small or impossible to create. | BOOTSTRAP |
+| `LOAD-ASSET` | `( "file" -- )` — `(LOAD-ASSET)` with the bank named for the file's basename: `LOAD-ASSET ROGUE.SPR` loads bank `ROGUE`. `ABORT` on failure. | BOOTSTRAP |
+
 `NEEDS` is the suite's standard delivery for optional source
 (`06-ENVIRONMENTS.md` §9, `07-FLOATING-POINT.md` §7). It does not
 replace block `LOAD` (§9), which interprets source the user wrote,

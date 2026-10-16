@@ -1,12 +1,13 @@
 # 13 — Game Loop Specification
 
-**Version 1.1, draft, design only.** See `00-OVERVIEW.md` for
-normative-language definitions and suite scope. Nothing here is
-implemented on any reference target yet. It supersedes Rebel-Sim's
-pre-spec `GAME-LOOP.md`, which was written before environments existed
-and treated the driving loop, scheduling and pausing as open problems.
-§11 lists what the rest of the suite gains when this is implemented. Those
-documents are not changed until then.
+**Version 1.1, draft.** See `00-OVERVIEW.md` for normative-language
+definitions and suite scope. Rebel-Sim implements §2–§7 and the
+`LOAD-ASSET` part of §8 (its milestones M83–M86); `MEMO-LOAD` and carts
+(§8) are not built anywhere yet. It supersedes Rebel-Sim's pre-spec
+`GAME-LOOP.md`, which was written before environments existed and
+treated the driving loop, scheduling and pausing as open problems.
+§11 lists what this adds to the rest of the suite, and which of those
+changes have landed.
 
 ## 1. Purpose and scope
 
@@ -199,7 +200,13 @@ An **entity table** is one bank: a header, then fixed-size records.
 Each record holds an active flag, the xt of its update word, and
 entity-specific data the game lays out itself.
 
-- `ENTITIES ( -- )`, run once per frame, calls the update word of
+- `NEW-ENTITIES ( count size -- )` makes the table, `size` bytes per
+  record: a flags cell (active when non-zero), the update word's xt,
+  then the game's own data from `REC-DATA` (offset 8).
+- `SPAWN ( xt -- record | 0 )` activates the first free record with
+  update word `xt` and its data zeroed; `0` if the table is full.
+  `KILL ( record -- )` frees one.
+- `RUN-ENTITIES ( -- )`, run once per frame, calls the update word of
   every active entity in table order, each with the record's address
   on the stack: `( record -- )`.
 - An update word may deactivate its own record, or activate a free
@@ -213,17 +220,23 @@ boss, a shadow). A **render list** is one bank of fixed-size slots:
 
 | Field | Meaning |
 |---|---|
-| `flags` | Active, h-flip, v-flip, layer. |
+| `flags` | Bit 0 active, bits 1–2 the layer, 0 to 3. |
 | `x`, `y` | Pixel position. |
 | `entry` | Index into the active sprite bank. |
 
-An entity moves its sprite by writing its slot: a plain store, never a
-draw call. `RENDER ( -- )`, run once per frame after `ENTITIES` and
-before `VSYNC`:
+Each field is one cell. `NEW-SLOTS ( count -- )` makes the list,
+`PLACE ( x y entry i -- )` shows a sprite in slot `i`, `UNPLACE ( i -- )`
+hides it, and `LAYER! ( layer i -- )` moves it between layers. Flipping
+comes from the sprite bank entry's own flags; a slot does not override
+it. An entity moves its sprite by writing its slot, a plain store,
+never a draw call. `RENDER ( -- )`, run once per frame after
+`RUN-ENTITIES` and before `VSYNC`:
 
-1. Restores the background, by default a full redraw: `CLS` or the
-   current room's tiles (`12-WORLD-MAP.md`).
-2. Draws every active slot, in layer order, with `SPRITE`.
+1. Restores the background by executing the xt in `BACKGROUND`: by
+   default `CLS`, typically the game's own room of tiles
+   (`12-WORLD-MAP.md`).
+2. Draws every active slot with `SPRITE`, layer 0 first, then in slot
+   order within a layer.
 
 Full redraw is the default because it is simple and always correct. A
 dirty-rectangle variant, restoring only where slots were last frame, is
@@ -242,9 +255,14 @@ Collisions are not stored.
 ```forth
 : INVADERS-STEP ( -- )
   ENV-REASON @  ENV-STEP ENV-REASON !
-  ENV-STEP = 0= IF  REDRAW-ALL  THEN   \ entered or recovered
-  ENTITIES  RENDER  VSYNC ;
+  ENV-STEP = 0= IF  BANK@ INVADERS SPRITE-BASE !  THEN   \ entered or recovered
+  FRAME ;                       \ RUN-ENTITIES RENDER VSYNC
 ```
+
+Re-entry sets `SPRITE-BASE` again, because another environment may
+have changed it. A complete example, `ROGUE`, ships with Rebel-Sim
+(`rogue.fth`): a room of tiles, a hero moved with `KEY-DOWN?`, bouncing
+enemies, coins to collect.
 
 ## 8. Delivery
 
@@ -253,8 +271,10 @@ Collisions are not stored.
   its own, and ends with its `ENVIRONMENT` line. `INVADERS` then
   starts it. Loading never enters it (`06-ENVIRONMENTS.md` §9).
 - **Assets are banks**: sprite sheets (`SPRT`), world maps (`DATA`,
-  `12-WORLD-MAP.md`), tables. They are created or loaded by the module,
-  or come from the project (`BANK-LOAD`).
+  `12-WORLD-MAP.md`), tables. The target ships them beside the module
+  in the project-asset format, and the module loads them with
+  `LOAD-ASSET` (`04-FORTH-CORE.md` §6.16): `LOAD-ASSET INVADERS.SPR`.
+  Or they come from the project (`BANK-LOAD`).
 - **Writing a game on the machine itself** happens in MEMO. MEMO needs
   one addition for that, already among its open questions
   (`09-MEMO.md` §10): `MEMO-LOAD name` interprets a document's pages as
@@ -304,6 +324,7 @@ Each lands with the implementation. Rows marked **Done** have landed.
 | `03-SYSVARS.md` §7 | **Done:** `KEYBOARD` offsets 8–39, `KEYS-DOWN`, 256 bits as 8 cells. |
 | `03-SYSVARS.md` §9 | **Done:** `SPRITE` offset 0, `SPRITE-BASE`. The group stops being reserved. |
 | `04-FORTH-CORE.md` §6.17 | **Done:** `VSYNC`, `MS@`, `SPRITE` (KERNEL); `MS`, `KEY-DOWN?`, `TILE` (BOOTSTRAP). |
+| `01-HAL.md` §6.7, `04-FORTH-CORE.md` §6.16 | **Done:** module names may carry an extension; `LOAD-ASSET` loads a shipped asset file into a bank (§8). |
 | `09-MEMO.md` §7 | `MEMO-LOAD`. |
 | `11-SPRITE-BANK.md` | **Done:** `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`; the entry-count header; an offset cache optional and never stale. |
 | `12-WORLD-MAP.md` | **Done:** tile indices resolve against `SPRITE-BASE`; the open gap is closed. |
