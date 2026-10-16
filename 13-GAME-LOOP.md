@@ -1,9 +1,9 @@
 # 13 — Game Loop Specification
 
 **Version 1.1, draft.** See `00-OVERVIEW.md` for normative-language
-definitions and suite scope. Rebel-Sim implements §2–§7 and the
-`LOAD-ASSET` part of §8 (its milestones M83–M86); `MEMO-LOAD` and carts
-(§8) are not built anywhere yet. It supersedes Rebel-Sim's pre-spec
+definitions and suite scope. Rebel-Sim implements all of it (its
+milestones M83–M87) except carts (§8), which are not built anywhere
+yet. It supersedes Rebel-Sim's pre-spec
 `GAME-LOOP.md`, which was written before environments existed and
 treated the driving loop, scheduling and pausing as open problems.
 §11 lists what this adds to the rest of the suite, and which of those
@@ -275,11 +275,10 @@ enemies, coins to collect.
   in the project-asset format, and the module loads them with
   `LOAD-ASSET` (`04-FORTH-CORE.md` §6.16): `LOAD-ASSET INVADERS.SPR`.
   Or they come from the project (`BANK-LOAD`).
-- **Writing a game on the machine itself** happens in MEMO. MEMO needs
-  one addition for that, already among its open questions
-  (`09-MEMO.md` §10): `MEMO-LOAD name` interprets a document's pages as
-  Forth source, line by line, as `EVALUATE-LINES` does. Then a game is
-  written in MEMO, run with `MEMO-LOAD`, and saved with the project.
+- **Writing a game on the machine itself** happens in MEMO.
+  `MEMO-LOAD name` (`09-MEMO.md` §7.1) interprets a document as Forth
+  source, so a game is written in MEMO, loaded with `MEMO-LOAD`, and
+  saved with the project like any other bank.
 - **Carts** (`01-HAL.md` §6.3's `CART`) are the natural packaging for a
   finished game, its module and assets together. They are not designed
   yet.
@@ -325,7 +324,7 @@ Each lands with the implementation. Rows marked **Done** have landed.
 | `03-SYSVARS.md` §9 | **Done:** `SPRITE` offset 0, `SPRITE-BASE`. The group stops being reserved. |
 | `04-FORTH-CORE.md` §6.17 | **Done:** `VSYNC`, `MS@`, `SPRITE` (KERNEL); `MS`, `KEY-DOWN?`, `TILE` (BOOTSTRAP). |
 | `01-HAL.md` §6.7, `04-FORTH-CORE.md` §6.16 | **Done:** module names may carry an extension; `LOAD-ASSET` loads a shipped asset file into a bank (§8). |
-| `09-MEMO.md` §7 | `MEMO-LOAD`. |
+| `09-MEMO.md` §7.1 | **Done:** `MEMO-LOAD` and `(MEMO-LOAD)`. |
 | `11-SPRITE-BANK.md` | **Done:** `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`; the entry-count header; an offset cache optional and never stale. |
 | `12-WORLD-MAP.md` | **Done:** tile indices resolve against `SPRITE-BASE`; the open gap is closed. |
 

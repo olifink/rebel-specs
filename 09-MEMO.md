@@ -399,6 +399,8 @@ These are in the `FORTH` vocabulary once MEMO is loaded.
 | `MEMO-OPEN name` | `( "name" -- )` — make the named bank the current document, then, if MEMO is the active environment, show it. `ABORT` if it cannot be opened. |
 | `(MEMO-OPEN)` | `( addr len -- flag )` — the same with the name on the stack; `FALSE` instead of `ABORT`. Never enters MEMO. |
 | `EDIT` | `( n -- )` — edit Forth screen `n`: make the bank named `BLKS` the current document at block `n`, cursor at the top left, and enter MEMO. `ABORT` if there is no such bank or no such block, or the screen is smaller than 64 × 16. |
+| `MEMO-LOAD name` | `( "name" -- )` — interpret the named document as Forth source: every line of every page in use, page 0 first and top to bottom, each passed to `EVALUATE` (`04-FORTH-CORE.md` §6.15). `ABORT` if there is no such bank or it is not a page document. See below. |
+| `(MEMO-LOAD)` | `( addr len -- flag )` — the same with the name on the stack; `FALSE` instead of `ABORT`. |
 
 `MEMO-OPEN` decides how to treat a bank from the bank itself: a bank
 tagged `BLKS` is opened as a block bank (§3.4), any other must carry a
@@ -423,6 +425,19 @@ created.
 MEMO starts with the document `NOTES` current, creating it if needed.
 The current document's name is ordinary dictionary state: it survives
 switching environments and is reset when MEMO is reloaded.
+
+**`MEMO-LOAD`.** Because `STATE` carries over from line to line, a
+definition may span lines and pages, and a document of Forth source is
+loaded the way a block of screens is with `LOAD`. Like `LOAD`, it
+compiles with `CONTEXT` set to `CURRENT` for the duration, and restores
+`CONTEXT` afterwards. It reads the bank in place and changes nothing
+about MEMO's own state: the current document, page and cursor are left
+as they were, so `MEMO-LOAD` may be run from a line in MEMO (§6) to load
+another document. A document may `MEMO-LOAD` another; one that loads
+itself recurses until the return stack overflows, which is an ordinary
+error. A `BLKS` bank is refused, because its screens already have
+`LOAD`. A status comment left on a line by §6.2 is a `\` comment, so a
+document that has been worked on in MEMO still loads.
 
 ### 7.2 Working on a document from Forth
 
@@ -494,9 +509,8 @@ environments are simply peers.
   byte encoding for the keys in §4 and §5.
 - **Color and emphasis.** Pages are characters only. Per-cell
   attributes would double the page size and are deferred until wanted.
-- **Loading a page as Forth source.** Executing one line is specified;
-  interpreting a whole page or document line by line is a small step
-  further and overlaps with block `LOAD` (`04-FORTH-CORE.md` §9).
+- ~~**Loading a page as Forth source.**~~ Resolved: `MEMO-LOAD` (§7.1)
+  interprets a whole document.
 - **Word-processing words.** Centring, justifying, searching, and
   replacing are expected to be Forth words over the page bank (§6.5).
   None is specified.
