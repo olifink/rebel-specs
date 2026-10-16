@@ -1451,6 +1451,27 @@ NEEDS FLOAT
 replace block `LOAD` (§9), which interprets source the user wrote,
 held in a project.
 
+### 6.17 Frames, time and held keys
+
+What a program needs to run at the display's pace, measure time, and
+poll the keyboard instead of waiting on it, most of all a game
+(`13-GAME-LOOP.md`).
+
+| Word | Effect | |
+|---|---|---|
+| `VSYNC` | `( -- )` — waits until `FRAME-COUNT` differs from its value when `VSYNC` was called. Suspends as `KEY` does (§4.3, §4.4), waiting on frames instead of the channel. A target that double-buffers presents the frame here. | **KERNEL** |
+| `MS@` | `( -- n )` — milliseconds since boot, from `hal_millis` (`01-HAL.md` §7.1), wrapping at 2^32. Compare differences, never absolute values. | **KERNEL** |
+| `MS` | `( n -- )` — waits at least `n` milliseconds, calling `VSYNC` while it waits. | BOOTSTRAP |
+| `KEY-DOWN?` | `( usage -- flag )` — `TRUE` while the key with that usage code is held (`01-HAL.md` §4.3). | BOOTSTRAP |
+| `FRAME-COUNT` `KEYS-DOWN` | `( -- addr )` — the sysvars' addresses (`03-SYSVARS.md` §6, §7). | BOOTSTRAP |
+
+`VSYNC` is KERNEL because it may suspend, like `KEY`. `MS@` is KERNEL
+because it reaches the HAL. `MS` and `KEY-DOWN?` are a loop over those
+and a bit test, so Forth source suffices.
+
+A target with no display has no frames: its `VSYNC` returns at once,
+and `MS` then busy-waits on `MS@`.
+
 ---
 
 ## 7. The bootstrap layer
@@ -1692,6 +1713,7 @@ today:
 | The bootstrap load (§7.1) re-runs after `COLD`, exactly as at genuine first boot | §4.6, §7.1 |
 | `(BANK-FIND)`/`(BANK-CREATE)`/`(BANK-SAVE)`/`(BANK-LOAD)`/`(BANK-REMOVE)` exist with §6.14's stack effects and failure results (`0`/`FALSE`, never `ABORT`); the parsing bank words behave as their §6.14 equivalents | §6.14 |
 | `EKEY` returns key presses only, packed as §6.9 specifies, and suspends as `KEY` does; `EVALUATE` restores the caller's input line and cursor | §6.9, §6.15 |
+| `VSYNC` suspends as `KEY` does until `FRAME-COUNT` changes; `MS@` reads `hal_millis`; `KEY-DOWN?` reads `KEYS-DOWN` | §6.17 |
 | `(MODULE-READ)` suspends while the module HAL is pending and never makes module text part of the saved project; `NEEDS` loads a module at most once, as recorded by its `NAME.FTH` marker word, and defines the marker only after a complete load | §6.16 |
 | Any uncaught error clears both stacks, reports via `hal_report_error`, and returns to a clean prompt | §8 |
 | The driving loop executes `ENV-ENTRY` when it is non-zero; recovery and `WARM` set `ENV-REASON` to `2` only when it holds `0` | §5.6, §8, `06-ENVIRONMENTS.md` §5.2 |

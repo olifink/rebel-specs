@@ -228,6 +228,7 @@ read the two together, not as duplicates of each other.
 | 28 | `PAPER` | REQUIRED |
 | 32 | `CURSOR-VISIBLE` | OPTIONAL (`01-HAL.md` §3.5) |
 | 36 | `PALETTE-BASE` | **REQUIRED** if display-capable (`01-HAL.md` §3.6) |
+| 40 | `FRAME-COUNT` | **REQUIRED** if display-capable: displayed frames since boot, wrapping (`01-HAL.md` §3.9) |
 
 ## 7. `KEYBOARD`
 
@@ -237,6 +238,7 @@ Base `0x080`, 64 bytes reserved. Field meanings: `01-HAL.md` §4.6.
 |---|---|---|
 | 0 | `MODIFIERS` | REQUIRED |
 | 4 | `KEYBOARD-COUNT` | OPTIONAL |
+| 8–39 | `KEYS-DOWN` | **REQUIRED** if input-capable: 256 bits as 8 cells, bit *u* set while key *u* is held (`01-HAL.md` §4.3) |
 
 ## 8. `FONT`
 

@@ -91,7 +91,8 @@ void screen_frame(void);
 ```
 
 The portable layer owns the counter. The HAL only reports that a frame
-happened.
+happened. A target may skip frames during which nothing can be waiting
+on one, such as an idle prompt (`01-HAL.md` §3.9).
 
 ### 3.2 `VSYNC`
 
@@ -288,16 +289,16 @@ Collisions are not stored.
 
 ## 11. Where the rest of the suite will carry this
 
-Nothing below is changed yet. Each lands with the implementation.
+Each lands with the implementation. Rows marked **Done** have landed.
 
 | Document | Change |
 |---|---|
-| `01-HAL.md` §3 | `screen_frame()`, a Type B entry point, and `FRAME-COUNT`'s meaning. |
-| `01-HAL.md` §4.3 | The Keyboard Module maintains `KEYS-DOWN`. |
-| `03-SYSVARS.md` §6 | `SCREEN` offset 40: `FRAME-COUNT`. |
-| `03-SYSVARS.md` §7 | `KEYBOARD` offsets 8–39: `KEYS-DOWN`, 256 bits as 8 cells. |
+| `01-HAL.md` §3.9 | **Done:** `screen_frame()`, a Type B entry point, and `FRAME-COUNT`'s meaning. |
+| `01-HAL.md` §4.3 | **Done:** the Keyboard Module maintains `KEYS-DOWN`. |
+| `03-SYSVARS.md` §6 | **Done:** `SCREEN` offset 40, `FRAME-COUNT`. |
+| `03-SYSVARS.md` §7 | **Done:** `KEYBOARD` offsets 8–39, `KEYS-DOWN`, 256 bits as 8 cells. |
 | `03-SYSVARS.md` §9 | `SPRITE` offset 0: `SPRITE-BASE`. The group stops being reserved. |
-| `04-FORTH-CORE.md` §6 | `VSYNC`, `MS@`, `SPRITE` (KERNEL); `MS`, `KEY-DOWN?`, `TILE` (BOOTSTRAP). |
+| `04-FORTH-CORE.md` §6.17 | **Done:** `VSYNC`, `MS@` (KERNEL); `MS`, `KEY-DOWN?` (BOOTSTRAP). Still to come with sprites: `SPRITE` (KERNEL), `TILE` (BOOTSTRAP). |
 | `09-MEMO.md` §7 | `MEMO-LOAD`. |
 | `11-SPRITE-BANK.md` | `SPRITE`/`TILE` replace `SPRITE!`/`TILE!`. (Its entry-count header is already in.) |
 | `12-WORLD-MAP.md` | Tile indices resolve against `SPRITE-BASE`; the open gap closes. |

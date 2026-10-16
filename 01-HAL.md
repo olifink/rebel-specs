@@ -511,6 +511,22 @@ that offers sprite/tile words at all **MUST** implement
 `hal_blit_sprite` natively; a portable per-pixel fallback over
 `hal_draw_pixel` is not part of this specification.
 
+### 3.9 Frame call-in (Type B)
+
+```c
+/* Called by the target once per displayed frame: at vertical blank,
+ * on a tearing-effect line, or per host animation frame. May be called
+ * from interrupt context. */
+void screen_frame(void);
+```
+
+The portable Screen Module's only response is to advance the `SCREEN`
+group's `FRAME-COUNT` sysvar by one, wrapping at 2^32. It **MUST NOT**
+call into Forth. `VSYNC` (`04-FORTH-CORE.md` §6.17) waits for it.
+**REQUIRED** if display-capable. A target **MAY** skip frames during
+which nothing can be waiting on one, such as a stopped host pump at an
+idle prompt, since no program can observe the difference.
+
 ---
 
 ## 4. Keyboard / Input
@@ -550,6 +566,12 @@ tracking — is portable (§4.3).
 
 ### 4.3 Portable Keyboard Module (implement once, share everywhere)
 
+- **Held-key state** (`KEYS-DOWN`, `03-SYSVARS.md` §7): 256 bits, one
+  per `usage_code`, the modifier pseudo-codes `0x80`–`0x87` included.
+  On every raw event the module **MUST** set or clear the key's bit
+  *before* queueing the event, so the state is right even when the
+  queue is full and the event is dropped. Reading events never changes
+  it. `KEY-DOWN?` (`04-FORTH-CORE.md` §6.17) tests it.
 - **Event queue**: a ring buffer of translated events,
   RECOMMENDED minimum depth 32 (this models realistic input burst rates,
   not a hard architectural limit — a target MAY use a deeper queue). On
@@ -1312,6 +1334,7 @@ somewhere, not before:
 | `hal_clear_screen` | A | **REQUIRED** if display-capable | Screen §3.3 |
 | `hal_draw_pixel`/`read_pixel`/`line`/`rect`/`rect_outline` | A | OPTIONAL | Screen §3.4 |
 | `hal_blit_sprite` | A | OPTIONAL; **REQUIRED** if the target offers sprite/tile words | Screen §3.8 |
+| `screen_frame` | B (target calls in) | **REQUIRED** if display-capable | Screen §3.9 |
 | `PAL`/`ATTR` banks + `PALETTE-BASE` field | data/bank | **REQUIRED** if display-capable | Screen §3.6, `02-MEMORY-MODEL.md` §4.6 |
 | `keyboard_push_raw_event` | B (target calls in) | **REQUIRED** if input-capable | Keyboard §4.2 |
 | `keyboard_has_event` / `keyboard_read_event` | portable | n/a — never reimplement | Keyboard §4.3 |
