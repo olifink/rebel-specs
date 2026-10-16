@@ -178,6 +178,7 @@ spaces.
 |---|---|
 | Left, Right, Up, Down | Move one cell. The cursor stops at the page's edges; it never wraps and never changes page. |
 | Home | To column 0. |
+| Tab | To the next tab stop: the next column that is a multiple of 8, or the last column if there is none. No text changes. |
 | End | To just after the line's last non-space character, or the last column if the line is full. |
 | Enter | To column 0 of the next line. On the last line, to column 0 of the same line. |
 
@@ -192,6 +193,7 @@ spaces.
 
 | Key | Effect |
 |---|---|
+| Shift-Tab | **Insert spaces up to the next tab stop**: from 1 to 8 of them, enough to bring the character under the cursor to the next multiple of 8. Everything from the cursor rightward moves that far right, and what passes the right margin is lost, as with Shift-Space. The cursor moves with the text, to the tab stop, so a second Shift-Tab indents by a further 8. |
 | Shift-Space | **Insert a space** at the cursor. The character under the cursor and everything to its right move one cell right; the line's last character is lost. The cursor does not move. *(On a blank line this key splits the page instead — §5.2.)* |
 | Delete | **Delete the character** under the cursor. Everything to its right moves one cell left and a space enters at the right margin. The cursor does not move. |
 | Shift-Delete, Alt-Backspace | **Clear to the end of the line**: the character under the cursor and everything to its right become spaces. The cursor does not move. Both chords do it, because on keyboards whose Delete is itself a remapped chord (ChromeOS's Search- or Alt-Backspace) Shift-Delete may never reach the machine. |
