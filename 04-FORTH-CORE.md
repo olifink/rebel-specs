@@ -1534,6 +1534,7 @@ than re-specifying byte-for-byte:
 | Word | Contract | Depends on |
 |---|---|---|
 | `WORDS` | `( -- )` — lists every non-`HIDDEN` dictionary entry name, most-recently-defined first. | `LATEST`, `@`, `C@`, `TYPE`, `EMIT` |
+| `VLIST` | `( -- )` — the same as `WORDS`, under fig-Forth's name for it. | `WORDS` |
 | `BANKS` | `( -- )` — lists every active bank's `name` (`02-MEMORY-MODEL.md` §4.7), space separated, walking `MMAP`'s own fixed-stride slot table directly by raw address arithmetic — the same "it's just arena memory" treatment `WORDS` gives the dictionary chain. `MMAP` itself is always bank 0 at absolute base 0 (`02-MEMORY-MODEL.md` §5), so no lookup primitive is needed to find the table before walking it. | `@`, `C@`, `EMIT` |
 | `DUMP` | `( addr -- )` — classic hex dump: 16 rows of 8 bytes, each an 8-digit hex address, 8 space-separated 2-digit hex bytes, then those same 8 bytes again as characters, with anything below `BL` shown as `.`. Fixed 128-byte extent, no length argument. Built on three small helpers of its own — `HEXDIGIT`/`HEX2`/`HEX8` — which derive hex formatting entirely from `/`/`MOD`, needing no shift primitive. No bounds checking against the arena's real extent, the same trust-the-caller convention `@`/`C@`/`BANK@` already carry. | `@`, `C@`, `EMIT`, `/`, `MOD` |
 | `>CFA` | `( entry-addr -- cfa )` — computes a dictionary entry's Code Field address from its own address (reads the flags byte, masks the name-length bits, aligns past the name). | `@`, `C@` |

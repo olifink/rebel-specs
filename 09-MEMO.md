@@ -275,10 +275,10 @@ the line the cursor is on as Forth**, and that is the whole command
 system: a command is typed into the document, wherever there is a line
 for it, and run from there.
 
-**Shift-Esc on a blank line leaves MEMO.** It commits the page and
-switches to the home environment, exactly as executing `HOME` from a
-line would, but with nothing written to the page: no output and no
-status.
+**Esc leaves MEMO**, from any line, and so does Shift-Esc on a blank
+line. Either commits the page and switches to the home environment,
+exactly as executing `HOME` from a line would, but with nothing written
+to the page: no output and no status.
 
 ### 6.1 What the user sees
 
@@ -474,8 +474,8 @@ the project, or on its own with `BANK-SAVE name`, like any other
   MEMO trusts.
 - **Colors.** A page has no color information. MEMO shows it in the
   current `INK` and `PAPER`.
-- **Leaving.** Shift-Esc on a blank line (§6), or any switching word
-  executed as in §6. The page is committed first either way.
+- **Leaving.** Esc, or Shift-Esc on a blank line (§6), or any switching
+  word executed as in §6. The page is committed first in every case.
 
 ## 9. Editing on behalf of another environment
 
@@ -537,6 +537,6 @@ environments are simply peers.
 | Line join and page join do nothing when nothing could be kept | §4.4, §5.3 |
 | The page is committed before any page turn, any executed line, and any environment switch | §2.1, §6.3 |
 | An executed line's output is captured and written below the command, never above it and never past the bottom of the page; its status is written on its own line as a `\` comment | §6.1–§6.3 |
-| Shift-Esc on a blank line commits the page and switches to `HOME` | §6 |
+| Esc, and Shift-Esc on a blank line, commit the page and switch to `HOME` | §6 |
 | `MEMO` always enters on the current page document; a block bank is shown only when opened by `EDIT` or `MEMO-OPEN` | §7.1 |
 | A document whose page does not fit the screen is refused | §2.1, §3.3 |
